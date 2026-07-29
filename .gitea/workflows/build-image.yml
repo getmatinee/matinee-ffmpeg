@@ -1,0 +1,94 @@
+# Copyright (C) 2023-2026 Matinee
+# Author: Michael André Reber
+# License: AGPL-3.0-or-later
+# https://github.com/getmatinee/matinee
+
+name: Build multi-arch image and push to Docker Hub and GHCR
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - Containerfile
+      - build-debian.sh
+      - common.sh
+      - versions.env
+      - patches/**
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: linux_amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable binfmt/QEMU for cross-arch RUN steps
+        run: |
+          podman run --privileged --rm docker.io/tonistiigi/binfmt --install all
+
+      - name: Login to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DH_TOKEN" | podman login docker.io --username "$DH_USER" --password-stdin
+
+      - name: Login to GHCR
+        if: ${{ secrets.GHCR_USERNAME && secrets.GHCR_TOKEN }}
+        env:
+          GHCR_USER: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | podman login ghcr.io --username "$GHCR_USER" --password-stdin
+
+      - name: Extract version
+        id: version
+        run: |
+          . ./versions.env
+          if [ -z "$FFMPEG_VERSION" ]; then
+            echo "Failed to read FFMPEG_VERSION from versions.env" >&2
+            exit 1
+          fi
+          echo "version=$FFMPEG_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build multi-arch manifest locally
+        env:
+          LOCAL_MANIFEST: localhost/matinee-ffmpeg:${{ github.sha }}
+          PLATFORMS: linux/amd64,linux/arm64
+        run: |
+          podman build --pull \
+            --platform "$PLATFORMS" \
+            --manifest "$LOCAL_MANIFEST" \
+            --label org.opencontainers.image.title=matinee-ffmpeg \
+            --label org.opencontainers.image.source=https://github.com/getmatinee/matinee-ffmpeg \
+            --label org.opencontainers.image.version="${{ steps.version.outputs.version }}" \
+            --label org.opencontainers.image.revision="${{ github.sha }}" \
+            --label org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label org.opencontainers.image.licenses=GPL-3.0-or-later \
+            -f Containerfile .
+          podman manifest inspect "$LOCAL_MANIFEST"
+
+      - name: Push to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        env:
+          DH_NS: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_REPO: matinee-ffmpeg
+          LOCAL_MANIFEST: localhost/matinee-ffmpeg:${{ github.sha }}
+        run: |
+          DEST="docker://docker.io/$DH_NS/$DH_REPO"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:${{ github.sha }}"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:${{ steps.version.outputs.version }}"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:latest"
+
+      - name: Push to GHCR
+        if: ${{ secrets.GHCR_USERNAME && secrets.GHCR_TOKEN }}
+        env:
+          GHCR_NS: getmatinee
+          GHCR_REPO: matinee-ffmpeg
+          LOCAL_MANIFEST: localhost/matinee-ffmpeg:${{ github.sha }}
+        run: |
+          DEST="docker://ghcr.io/$GHCR_NS/$GHCR_REPO"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:${{ github.sha }}"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:${{ steps.version.outputs.version }}"
+          podman manifest push --all "$LOCAL_MANIFEST" "$DEST:latest"

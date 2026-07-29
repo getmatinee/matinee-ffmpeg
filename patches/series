@@ -1,0 +1,6 @@
+matinee-0001-nvdec-exceed-32-surfaces.patch
+matinee-0002-ffmpeg-cli-pause-support.patch
+matinee-0003-no-sw-colorconv-between-hw-formats.patch
+matinee-0004-cuda-func-header.patch
+matinee-0005-cuda-pixfmt-converter.patch
+matinee-0006-cuda-tonemap.patch

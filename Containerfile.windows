@@ -1,0 +1,32 @@
+# Copyright (C) 2023-2026 Matinee
+# Author: Michael André Reber
+# License: AGPL-3.0-or-later
+# https://github.com/getmatinee/matinee
+#
+# Cross-build container for the Windows FFmpeg
+
+FROM debian:trixie
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        autoconf \
+        automake \
+        build-essential \
+        ca-certificates \
+        clang \
+        cmake \
+        curl \
+        g++-mingw-w64-x86-64 \
+        gcc-mingw-w64-x86-64 \
+        git \
+        libtool \
+        meson \
+        nasm \
+        ninja-build \
+        patch \
+        pkg-config \
+        xz-utils \
+        yasm \
+        zip \
+        zstd \
+    && rm -rf /var/lib/apt/lists/*
