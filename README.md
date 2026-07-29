@@ -37,9 +37,9 @@ scripts.
 
 ## Container image
 
-Release images are published as `getmatinee/matinee-ffmpeg` on Docker Hub and as `ghcr.io/getmatinee/matinee-ffmpeg`, tagged with the FFmpeg version and `latest`. The backend image consumes them through its `FFMPEG_IMAGE` build argument.
+Release images are published as `getmatinee/matinee-ffmpeg` on Docker Hub and as `ghcr.io/getmatinee/matinee-ffmpeg`, tagged with the FFmpeg version and `latest`. The backend image consumes the Docker Hub image by default through its `FFMPEG_IMAGE` build argument, so nothing needs to be built here for a normal deployment.
 
-To build the image yourself:
+To build a local image variant yourself:
 
 ```bash
 podman build -t matinee-ffmpeg:local -f Containerfile .
