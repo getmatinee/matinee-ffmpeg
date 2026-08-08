@@ -45,7 +45,7 @@ To build a local image variant yourself:
 podman build -t matinee-ffmpeg:local -f Containerfile .
 ```
 
-To verify the pipeline is present in the produced image we can test this with:
+To verify the pipeline is present in the produced image:
 
 ```bash
 podman run --rm matinee-ffmpeg:local sh -c '\

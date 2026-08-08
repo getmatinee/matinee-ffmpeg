@@ -1,4 +1,4 @@
-# Matinee FFmpeg
+# Matinee FFmpeg patch series
 
 The curated patch series Matinee applies on top of pristine upstream FFmpeg. Every build script in this repository applies the patches listed in [`series`](series), in order, right after extracting the FFmpeg source and before `./configure`. To add or drop a patch, we do this in that file `series`.
 
@@ -6,24 +6,22 @@ All patches are minimal unified diffs. They modify FFmpeg and are therefore deri
 FFmpeg 8.1.2.
 
 ## Overview of currently applied patches
-See below to get insights what every patch does.
 
-
-### 0001 - NVDEC "exceed 32 surfaces" fix
+### 0001: NVDEC "exceed 32 surfaces" fix
 
 NVDEC rejects decoder init when asked for more than 32 decode surfaces; some high-DPB streams (e.g. certain HEVC) request more via `initial_pool_size` and init fails hard. The patch clamps `ulNumDecodeSurfaces`/`dpb_size` to `FFMIN(pool, 32)` and `ulNumOutputSurfaces` to `FFMIN(pool, 64)`, and adjusts one surface refcount accordingly. Small and defensive; it matters because the whole point of our build is the NVDEC -> NVENC pipeline.
 
-### 0002 - Cooperative pause for the ffmpeg CLI
+### 0002: Cooperative pause for the ffmpeg CLI
 
 Adds two globals (`paused_start`, `paused_time`), `p`/`u` keyboard commands, and one check in the demuxer's `input_thread`: while paused it sleeps 1 ms and skips `av_read_frame`, so the demuxer stops reading ahead (bounds memory) instead of buffering. Timing is corrected via `gettime_relative_minus_pause()` so stats stay accurate.
 
 Matinee's continuous HLS writer paces each long-running ffmpeg to ~realtime so it never races to encode the whole title and idles at ~0 CPU when playback pauses. That throttle (`matinee-server/internal/transcode/writer.go`) previously used `SIGSTOP`/`SIGCONT`; it now writes a single `p`/`u` byte to the writer ffmpeg's stdin instead. Cooperative pause is preferable to `SIGSTOP` here because the process holds an NVENC/CUDA context: `SIGSTOP` freezes it mid-syscall, while the patch pauses cleanly at the demuxer read loop. The writer's ffmpeg therefore runs **without** `-nostdin`; one-shot/audio/subtitle/thumbnail/download invocations keep `-nostdin`.
 
-### 0003 - No software colour-conversion between HW formats
+### 0003: No software colour-conversion between HW formats
 
-When the filtergraph output is a hardware pixel format, stock ffmpeg still appends colour-space/range/alpha options to format negotiation, which can make it insert a software colour-convert between two HW formats - a silent GPU->CPU->GPU roundtrip that collapses throughput. The patch skips those colour options when the output format carries `AV_PIX_FMT_FLAG_HWACCEL`. This keeps our `nvdec -> scale_cuda -> nvenc` path zero-copy.
+When the filtergraph output is a hardware pixel format, stock ffmpeg still appends colour-space/range/alpha options to format negotiation, which can make it insert a software colour-convert between two HW formats, a silent GPU->CPU->GPU roundtrip that collapses throughput. The patch skips those colour options when the output format carries `AV_PIX_FMT_FLAG_HWACCEL`. This keeps our `nvdec -> scale_cuda -> nvenc` path zero-copy.
 
-### 0004-0006 - GPU tonemapping
+### 0004-0006: GPU tonemapping
 
 Three patches taken together from jellyfin-ffmpeg master (their 0002 update-cuda-func-header, 0003 add-enhanced-cuda-pixfmt-converter-impl, 0004 add-cuda-tonemap-impl), which are already written against the FFFilter API and apply to 8.1.2.
 
