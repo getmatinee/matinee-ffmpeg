@@ -57,3 +57,11 @@ podman run --rm matinee-ffmpeg:local sh -c '\
 ## Credits
 
 Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), whose maintainers had already solved problems we also ran into with FFmpeg and streaming -> the NVDEC surface clamp, the cooperative CLI pause, and the CUDA tone-mapping stack. Thanks to them. The patches are derived works of FFmpeg and stay under FFmpeg's GPL/LGPL licensing.
+
+## Support the project
+
+Matinee is free software, funded by sponsorship through [GitHub Sponsors](https://github.com/sponsors/getmatinee) or [Ko-fi](https://ko-fi.com/matinee) and by the 1.- per month subscription of the prebuilt phone apps on the App Store and Play Store. Building the same apps from the sources is free of charge. The subscription pays for the store distribution and supports the project. See the [main repository](https://github.com/getmatinee/matinee#support-the-project) for the full picture.
+
+## License
+
+AGPL-3.0-or-later for the build scripts in this repository. The patches stay under FFmpeg's own GPL/LGPL licensing, and the resulting FFmpeg builds are GPL-3.0-or-later (GPL with the version3 option, no nonfree components).
