@@ -18,6 +18,18 @@ fetch_ffmpeg() {
     mkdir ffmpeg && tar -xf ffmpeg.tar.xz -C ffmpeg --strip-components=1
 }
 
+add_qsv_flag() {
+    case "$(uname -m)" in
+    x86_64 | amd64) ;;
+    *) return 0 ;;
+    esac
+    if pkg-config --exists "vpl >= 2.6" 2>/dev/null; then
+        FFMPEG_COMMON_FLAGS+=(--enable-libvpl)
+        return 0
+    fi
+    echo "note: libvpl >= 2.6 not found, building without Intel Quick Sync" >&2
+}
+
 apply_patch_series() {
     while read -r patchfile; do
         [ -n "$patchfile" ] || continue

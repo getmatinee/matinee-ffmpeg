@@ -203,6 +203,19 @@ build_vpx() {
         && make -j"$JOBS" && make install)
 }
 
+# The oneVPL dispatcher, which is how ffmpeg reaches Quick Sync on Windows..
+# It pairs with the d3d11va and dxva2 support already enabled below
+build_libvpl() {
+    fetch "https://github.com/intel/libvpl/archive/refs/tags/${VPL_VERSION}.tar.gz" libvpl.tar.gz
+    untar libvpl.tar.gz libvpl
+    cmake -S libvpl -B libvpl/build -G Ninja \
+        -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
+        -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF
+    cmake --build libvpl/build -j "$JOBS"
+    cmake --install libvpl/build
+}
+
 build_webp() {
     fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" webp.tar.gz
     untar webp.tar.gz webp
@@ -231,7 +244,7 @@ build_chromaprint() {
 }
 
 for dep in freetype fribidi harfbuzz libass x264 x265 dav1d svtav1 zimg \
-    opus lame ogg_vorbis vpx webp chromaprint; do
+    opus lame ogg_vorbis vpx webp chromaprint libvpl; do
     if [ ! -f "$prefix/.stamp-$dep" ]; then
         echo "=== building $dep ==="
         "build_$dep"
@@ -278,6 +291,7 @@ done < "$PATCHDIR/series"
     --enable-nvenc \
     --enable-d3d11va \
     --enable-dxva2 \
+    --enable-libvpl \
     --enable-libx264 \
     --enable-libx265 \
     --enable-libdav1d \

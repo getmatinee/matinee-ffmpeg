@@ -20,6 +20,7 @@ Upstream FFmpeg as a GPL build (no `--enable-nonfree`, no libfdk and no libnpp),
 
 - **NVIDIA full pipeline** -> (`ffnvcodec`, `cuda`, `cuda-llvm`, `cuvid`, `nvdec`, `nvenc`) hardware decode (NVDEC), CUDA filters (`scale_cuda`, and `tonemap_cuda` for HDR->SDR), and hardware encode (`h264_nvenc`, `hevc_nvenc`). `--enable-cuda-llvm` compiles the CUDA filter kernels with clang, so **no CUDA SDK** is needed. The NVIDIA driver's encode/decode libraries are provided at runtime by the NVIDIA Container Toolkit
 - **VAAPI** (`vaapi`, `libdrm`, `opencl`) `h264_vaapi` and OpenCL filters for AMD/Intel.
+- **Intel Quick Sync** (`libvpl`) `h264_qsv` and `scale_qsv` through the oneVPL dispatcher. Intel ships oneVPL for x86_64 only, so `add_qsv_flag` in `common.sh` adds the flag when the host is x86_64 and the dispatcher is present and builds without it otherwise, which keeps the arm64 legs of the multi-arch manifest working. The Windows script cross-builds the dispatcher itself and does not share the flag list.
 - **x264/x265 libraries** (`libx264`, `libx265`) -> `libx264` is the software-fallback encoder and `libx265` is ready for HEVC output
 - **AV1 and scaling** (`libdav1d`, `libsvtav1`, `libzimg`) efficient AV1 decode/encode and scaling
 - **Subtitles** (`libass`, `libfreetype`, `libfontconfig`, `libfribidi`, `libharfbuzz`) for subtitle burn-in
