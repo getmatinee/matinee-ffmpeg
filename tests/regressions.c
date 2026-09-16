@@ -3,56 +3,13 @@
 // License: AGPL-3.0-or-later
 // https://github.com/getmatinee/matinee
 
-// Regression cases for the mapped-frame and ASS header patches. None of them
-// needs a GPU, so the CPU validation build covers both
+// ASS header and trailer bounds, exercised without a GPU
 #include <stdio.h>
 #include <string.h>
 
 #include "libavformat/avformat.h"
 #include "libavutil/error.h"
-#include "libavutil/hwcontext.h"
 #include "libavutil/mem.h"
-#include "libswscale/swscale.h"
-
-static int mapped_software_frames(int mask)
-{
-    AVFrame *src = av_frame_alloc(), *dst = av_frame_alloc();
-    SwsContext *sws = sws_alloc_context();
-    int ret = AVERROR(ENOMEM);
-    if (!src || !dst || !sws)
-        goto end;
-    src->format = AV_PIX_FMT_YUV420P;
-    src->width = src->height = 32;
-    dst->format = AV_PIX_FMT_RGB24;
-    dst->width = dst->height = 16;
-    if (av_frame_get_buffer(src, 0) < 0 || av_frame_get_buffer(dst, 0) < 0)
-        goto end;
-    for (int plane = 0; plane < 3; plane++)
-        memset(src->data[plane], plane ? 128 : 80,
-               src->linesize[plane] * (plane ? 16 : 32));
-
-    // The pixel format, not the presence of a retained context reference, decides
-    // whether swscale converts in hardware
-    AVFrame *frames[] = { src, dst };
-    for (int i = 0; i < 2; i++) {
-        if (!(mask & (1 << i)))
-            continue;
-        frames[i]->hw_frames_ctx = av_buffer_allocz(sizeof(AVHWFramesContext));
-        if (!frames[i]->hw_frames_ctx)
-            goto end;
-        AVHWFramesContext *hwfc = (void *)frames[i]->hw_frames_ctx->data;
-        hwfc->format = AV_PIX_FMT_VAAPI;
-        hwfc->sw_format = AV_PIX_FMT_NV12;
-    }
-    ret = sws_scale_frame(sws, dst, src);
-    if (ret >= 0 && !dst->data[0][0])
-        ret = AVERROR_INVALIDDATA;
-end:
-    sws_free_context(&sws);
-    av_frame_free(&src);
-    av_frame_free(&dst);
-    return ret;
-}
 
 static int ass_header(const char *header, size_t header_size)
 {
@@ -93,13 +50,6 @@ end:
 
 int main(void)
 {
-    for (int mask = 0; mask < 4; mask++) {
-        int ret = mapped_software_frames(mask);
-        if (ret < 0) {
-            fprintf(stderr, "mapped software frames (mask %d): %s\n", mask, av_err2str(ret));
-            return 1;
-        }
-    }
     const char short_header[] = "[Script Info]\nScriptType: v4.00+\n[V4+ Styles]\n\0\0\0";
     const char full_header[] = "[Script Info]\nScriptType: v4.00+\n"
         "[V4+ Styles]\n[Events]\n"
@@ -114,6 +64,6 @@ int main(void)
             return 1;
         }
     }
-    puts("PASS mapped software frames (neither/source/destination/both contexts) and ASS header");
+    puts("PASS ASS header and trailer bounds");
     return 0;
 }

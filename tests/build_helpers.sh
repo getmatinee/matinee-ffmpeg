@@ -47,3 +47,78 @@ if apply_patch_series "$workdir/patches" > fuzz.log 2>&1; then
     echo 'fuzzy patch was accepted' >&2; exit 1
 fi
 echo 'PASS source checksum, repeated patch, offset and fuzz rejection'
+
+# Exercise retry, version changes and damaged cache entries without a network
+curl() {
+    local output= url=
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -o) output="$2"; shift 2 ;;
+            --retry) shift 2 ;;
+            -*) shift ;;
+            *) url="$1"; shift ;;
+        esac
+    done
+    printf '%s\n' "$url" >> downloads
+    printf '%s\n' "$url" > "$output"
+    [ "$url" != broken ]
+}
+if fetch_cached broken dependency.tar > download.log 2>&1; then
+    echo 'failed dependency download was accepted' >&2; exit 1
+fi
+[ ! -f dependency.tar ] && [ ! -f dependency.tar.source ]
+fetch_cached version-1 dependency.tar
+fetch_cached version-1 dependency.tar
+[ "$(wc -l < downloads)" -eq 2 ]
+fetch_cached version-2 dependency.tar
+grep -qx version-2 dependency.tar
+[ "$(wc -l < downloads)" -eq 3 ]
+printf 'damaged\n' > dependency.tar
+fetch_cached version-2 dependency.tar
+grep -qx version-2 dependency.tar
+[ "$(wc -l < downloads)" -eq 4 ]
+if fetch_cached broken dependency.tar > download.log 2>&1; then exit 1; fi
+grep -qx version-2 dependency.tar
+fetch_cached version-2 dependency.tar
+[ "$(wc -l < downloads)" -eq 5 ]
+# Caches without an integrity record must be downloaded once
+rm dependency.tar.source
+fetch_cached version-2 dependency.tar
+[ "$(wc -l < downloads)" -eq 6 ]
+
+printf recipe-1 > recipe
+key1="$(printf version-1 | build_cache_key recipe)"
+[ "$key1" = "$(printf version-1 | build_cache_key recipe)" ]
+mkdir 'other checkout'
+cp recipe 'other checkout/recipe'
+[ "$key1" = "$(printf version-1 | build_cache_key "$workdir/other checkout/recipe")" ]
+cp recipe $'other checkout/recipe\\with\nnewlines'
+[ "$key1" = "$(printf version-1 | build_cache_key "$workdir/"$'other checkout/recipe\\with\nnewlines')" ]
+[ "$key1" != "$(printf version-2 | build_cache_key recipe)" ]
+printf recipe-2 > recipe
+[ "$key1" != "$(printf version-1 | build_cache_key recipe)" ]
+printf recipe-3 > recipe-other
+[ "$(printf version-1 | build_cache_key recipe recipe-other)" != \
+  "$(printf version-1 | build_cache_key recipe-other recipe)" ]
+if printf version-1 | build_cache_key missing-recipe recipe > missing.log 2>&1; then
+    echo 'missing recipe was accepted' >&2; exit 1
+fi
+echo 'PASS dependency cache: failed downloads, relocation, changed versions/recipes and damaged archives'
+
+keep="$(printf active | sha256sum | cut -d ' ' -f1)"
+stale="$(printf stale | sha256sum | cut -d ' ' -f1)"
+linked="$(printf linked | sha256sum | cut -d ' ' -f1)"
+mkdir -p "cache/prefix-$keep" "cache/prefix-$stale" cache/prefix-unrelated cache/prefix outside
+touch outside/preserve
+ln -s "$workdir/outside" "cache/prefix-$linked"
+if prune_dependency_cache cache invalid; then
+    echo 'invalid active cache key was accepted' >&2; exit 1
+fi
+[ -d "cache/prefix-$stale" ]
+prune_dependency_cache cache "$keep"
+[ -d "cache/prefix-$keep" ] && [ ! -e "cache/prefix-$stale" ]
+[ -d cache/prefix-unrelated ] && [ -d cache/prefix ]
+[ -L "cache/prefix-$linked" ] && [ -f outside/preserve ]
+prune_dependency_cache cache "$keep"
+prune_dependency_cache empty-cache "$keep"
+echo 'PASS dependency pruning preserves the active prefix, unrelated paths and symlinks'
