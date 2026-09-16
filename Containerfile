@@ -42,6 +42,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY patches/ /opt/matinee-ffmpeg-patches/
+RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends libvpl-dev && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
+
+ARG JOBS=
+ENV JOBS=${JOBS}
+
 COPY versions.env common.sh build-debian.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/build-debian.sh && \
     PREFIX=/opt/matinee-ffmpeg PATCHDIR=/opt/matinee-ffmpeg-patches \

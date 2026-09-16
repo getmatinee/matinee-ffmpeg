@@ -23,6 +23,8 @@ cd "$workdir"
 
 install_nvcodec_headers
 
+add_qsv_flag
+
 fetch_ffmpeg
 cd ffmpeg
 apply_patch_series "$PATCHDIR"

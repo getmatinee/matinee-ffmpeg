@@ -3,8 +3,7 @@
 # License: AGPL-3.0-or-later
 # https://github.com/getmatinee/matinee
 #
-# Shared helpers for the Linux build scripts
-# build-windows.sh does not source this..
+# Shared source/patch helpers and Linux configure flags.
 
 install_nvcodec_headers() {
     git clone --quiet --depth 1 --branch "$NVCODEC_VERSION" \
@@ -13,15 +12,45 @@ install_nvcodec_headers() {
 }
 
 fetch_ffmpeg() {
-    curl -fsSL -o ffmpeg.tar.xz \
-        "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-    mkdir ffmpeg && tar -xf ffmpeg.tar.xz -C ffmpeg --strip-components=1
+    local archive="ffmpeg-${FFMPEG_VERSION}.tar.xz"
+    if [ ! -f "$archive" ]; then
+        curl -fsSL --retry 3 -o "$archive.tmp" \
+            "https://ffmpeg.org/releases/$archive" || return 1
+        mv "$archive.tmp" "$archive"
+    fi
+    printf '%s  %s\n' "$FFMPEG_SHA256" "$archive" | sha256sum --check --status || {
+        echo "FFmpeg source checksum mismatch: $archive" >&2
+        return 1
+    }
+    mkdir ffmpeg && tar -xf "$archive" -C ffmpeg --strip-components=1
+}
+
+add_qsv_flag() {
+    case "$(uname -m)" in
+    x86_64 | amd64) ;;
+    *) return 0 ;;
+    esac
+    if pkg-config --exists "vpl >= 2.6" 2>/dev/null; then
+        FFMPEG_COMMON_FLAGS+=(--enable-libvpl)
+        return 0
+    fi
+    echo "note: libvpl >= 2.6 not found, building without Intel Quick Sync" >&2
 }
 
 apply_patch_series() {
+    local patchfile output
     while read -r patchfile; do
         [ -n "$patchfile" ] || continue
-        patch -p1 --no-backup-if-mismatch < "$1/$patchfile"
+        if ! output="$(LC_ALL=C patch --batch --forward --fuzz=0 -p1 \
+            --no-backup-if-mismatch < "$1/$patchfile" 2>&1)"; then
+            printf '%s\n' "$output" >&2
+            return 1
+        fi
+        printf '%s\n' "$output"
+        if printf '%s\n' "$output" | grep -Eq 'fuzz|offset|FAILED|Reversed|malformed'; then
+            echo "Patch does not match the pinned source exactly: $patchfile" >&2
+            return 1
+        fi
     done < "$1/series"
 }
 

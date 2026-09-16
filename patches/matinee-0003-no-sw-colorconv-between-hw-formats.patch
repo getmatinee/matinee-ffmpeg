@@ -1,6 +1,6 @@
 --- a/fftools/ffmpeg_filter.c
 +++ b/fftools/ffmpeg_filter.c
-@@ -1708,9 +1708,22 @@ static int configure_output_video_filter(FilterGraphPriv *fgp, AVFilterGraph *gr
+@@ -1701,9 +1701,22 @@
                 ofp->format != AV_PIX_FMT_NONE || !ofp->pix_fmts);
      av_bprint_init(&bprint, 0, AV_BPRINT_SIZE_UNLIMITED);
      choose_pix_fmts(ofp, &bprint);

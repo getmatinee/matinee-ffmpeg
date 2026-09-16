@@ -51,6 +51,20 @@ mkdir svtav1 && tar -xf svtav1.tar.gz -C svtav1 --strip-components=1
     -DBUILD_SHARED_LIBS=OFF -DBUILD_APPS=OFF \
     && cmake --build build -j "$JOBS" && cmake --install build)
 
+# Quick Sync is x86_64 only, and the static build keeps the tarball
+# self-contained rather than depending on EPELs shared libvpl at runtime
+case "$(uname -m)" in
+x86_64)
+    curl -fsSL -o libvpl.tar.gz \
+        "https://github.com/intel/libvpl/archive/refs/tags/${VPL_VERSION}.tar.gz"
+    mkdir libvpl && tar -xf libvpl.tar.gz -C libvpl --strip-components=1
+    (cd libvpl && cmake -S . -B build \
+        -DCMAKE_INSTALL_PREFIX="$depprefix" -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF \
+        && cmake --build build -j "$JOBS" && cmake --install build)
+    ;;
+esac
+
 curl -fsSL -o zimg.tar.gz \
     "https://github.com/sekrit-twc/zimg/archive/refs/tags/${ZIMG_VERSION}.tar.gz"
 mkdir zimg && tar -xf zimg.tar.gz -C zimg --strip-components=1
@@ -68,6 +82,8 @@ mkdir chromaprint && tar -xf chromaprint.tar.gz -C chromaprint --strip-component
     && cmake --build build -j "$JOBS" && cmake --install build)
 
 install_nvcodec_headers "$depprefix"
+
+add_qsv_flag
 
 fetch_ffmpeg
 cd ffmpeg

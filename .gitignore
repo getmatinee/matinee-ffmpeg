@@ -3,3 +3,5 @@
 *.tar.zst
 /ffmpeg/
 /nv-codec-headers/
+__pycache__
+/_dev/
