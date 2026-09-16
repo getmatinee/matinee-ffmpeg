@@ -8,8 +8,9 @@
 
 set -euo pipefail
 
-. "$(dirname "$0")/versions.env"
-. "$(dirname "$0")/common.sh"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/versions.env"
+. "$script_dir/common.sh"
 FREETYPE_VERSION="${FREETYPE_VERSION:-2.13.3}"
 FRIBIDI_VERSION="${FRIBIDI_VERSION:-1.0.16}"
 HARFBUZZ_VERSION="${HARFBUZZ_VERSION:-10.1.0}"
@@ -33,7 +34,17 @@ JOBS="${JOBS:-$(nproc)}"
 HOST=x86_64-w64-mingw32
 
 workdir="${WORKDIR:-$(mktemp -d)}"
-prefix="$workdir/prefix"
+mkdir -p "$workdir"
+workdir="$(cd "$workdir" && pwd)"
+dependency_key="$({
+    declare -p FREETYPE_VERSION FRIBIDI_VERSION HARFBUZZ_VERSION LIBASS_VERSION \
+        X265_VERSION DAV1D_VERSION SVTAV1_VERSION ZIMG_VERSION OPUS_VERSION \
+        LAME_VERSION OGG_VERSION VORBIS_VERSION VPX_VERSION WEBP_VERSION \
+        CHROMAPRINT_VERSION VPL_VERSION NVCODEC_VERSION
+    printf '%s\n' "$HOST" "${CFLAGS:-}" "${CXXFLAGS:-}" "${LDFLAGS:-}"
+    "${HOST}-gcc" -dumpfullversion -dumpversion
+} | build_cache_key "$script_dir/build-windows.sh" "$script_dir/common.sh")"
+prefix="$workdir/prefix-$dependency_key"
 mkdir -p "$prefix"
 [ -n "${WORKDIR:-}" ] || trap 'rm -rf "$workdir"' EXIT
 cd "$workdir"
@@ -69,7 +80,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 EOF
 
 fetch() {
-    [ -f "$2" ] || curl -fsSL -o "$2" "$1"
+    fetch_cached "$@"
 }
 
 untar() {
@@ -311,4 +322,7 @@ make DESTDIR="$stage" install
 
 mkdir -p "$(dirname "$OUT")"
 tar --zstd -cf "$OUT" -C "$stage/ffmpeg" bin
+if [ "${PRUNE_DEPENDENCY_CACHE:-0}" = 1 ]; then
+    prune_dependency_cache "$workdir" "$dependency_key"
+fi
 echo "ffmpeg tarball: $OUT"

@@ -701,7 +701,7 @@
 +#endif /* AVFILTER_CUDA_COLORSPACE_COMMON_H */
 --- /dev/null
 +++ b/libavfilter/cuda/host_util.c
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,76 @@
 +/*
 + * This file is part of FFmpeg.
 + *
@@ -771,8 +771,10 @@
 +
 +fail:
 +    for (i = 0; i < dst->planes; i++)
-+        if (dst->tex[i])
++        if (dst->tex[i]) {
 +            CHECK_CU(cu->cuTexObjectDestroy(dst->tex[i]));
++            dst->tex[i] = 0;
++        }
 +
 +    return ret;
 +}
@@ -1979,7 +1981,7 @@
 +#endif /* AVFILTER_CUDA_UTIL_H */
 --- /dev/null
 +++ b/libavfilter/vf_tonemap_cuda.c
-@@ -0,0 +1,1284 @@
+@@ -0,0 +1,1293 @@
 +/*
 + * This file is part of FFmpeg.
 + *
@@ -3003,7 +3005,7 @@
 +    AVFrame *out = NULL;
 +    AVFrameSideData *dovi_sd = NULL;
 +    CUcontext dummy;
-+    int ret = 0;
++    int ret = 0, pop_ret, context_pushed = 0;
 +
 +    out = av_frame_alloc();
 +    if (!out) {
@@ -3049,8 +3051,10 @@
 +        if (rpu->disable_residual_flag) {
 +            struct FFDOVIMetadataRemap *dovi = av_malloc(sizeof(*dovi));
 +            s->dovi = dovi;
-+            if (!s->dovi)
++            if (!s->dovi) {
++                ret = AVERROR(ENOMEM);
 +                goto fail;
++            }
 +
 +            ff_map_dovi_metadata(s->dovi, metadata);
 +            in->color_trc = AVCOL_TRC_SMPTE2084;
@@ -3093,6 +3097,8 @@
 +    if (ret < 0)
 +        goto fail;
 +
++    context_pushed = 1;
++
 +    if (s->dovi) {
 +        update_dovi_buf(ctx);
 +
@@ -3109,7 +3115,10 @@
 +    if (s->dovi)
 +        av_freep(&s->dovi);
 +
-+    ret = CHECK_CU(cu->cuCtxPopCurrent(&dummy));
++    pop_ret = CHECK_CU(cu->cuCtxPopCurrent(&dummy));
++    context_pushed = 0;
++    if (ret >= 0)
++        ret = pop_ret;
 +    if (ret < 0)
 +        goto fail;
 +
@@ -3125,6 +3134,8 @@
 +
 +    return ff_filter_frame(outlink, out);
 +fail:
++    if (context_pushed)
++        CHECK_CU(cu->cuCtxPopCurrent(&dummy));
 +    if (s->dovi)
 +        av_freep(&s->dovi);
 +    av_frame_free(&in);

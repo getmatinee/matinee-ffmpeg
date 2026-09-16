@@ -11,6 +11,48 @@ install_nvcodec_headers() {
     make -C nv-codec-headers install ${1:+PREFIX="$1"}
 }
 
+# Cache an archive only after a complete download
+fetch_cached() {
+    local url="$1" archive="$2" saved_url saved_hash actual_hash tmp
+    if [ -f "$archive" ] && [ -f "$archive.source" ]; then
+        { IFS= read -r saved_url; IFS= read -r saved_hash; } < "$archive.source" || saved_hash=
+        if [ "$saved_url" = "$url" ]; then
+            actual_hash="$(sha256sum "$archive")"
+            if [ "${actual_hash%% *}" = "$saved_hash" ]; then
+                return 0
+            fi
+        fi
+    fi
+    tmp="$(mktemp "$archive.tmp.XXXXXX")" || return 1
+    if ! curl -fsSL --retry 3 -o "$tmp" "$url"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    actual_hash="$(sha256sum "$tmp")" || { rm -f "$tmp"; return 1; }
+    printf '%s\n%s\n' "$url" "${actual_hash%% *}" > "$tmp.source"
+    mv "$tmp" "$archive"
+    mv "$tmp.source" "$archive.source"
+}
+
+# Explicit inputs on stdin plus recipe contents form a dependency-set identity
+build_cache_key() {
+    local recipe
+    { cat; for recipe in "$@"; do sha256sum < "$recipe" || return 1; done; } | sha256sum | cut -d ' ' -f1
+}
+
+# Remove generated dependency prefixes except the one used by a successful build
+prune_dependency_cache() {
+    local workdir="$1" keep="$2" candidate name
+    [[ "$keep" =~ ^[0-9a-f]{64}$ ]] || return 1
+    for candidate in "$workdir"/prefix-*; do
+        name="${candidate##*/}"
+        [[ "$name" =~ ^prefix-[0-9a-f]{64}$ ]] || continue
+        [ "$name" != "prefix-$keep" ] || continue
+        [ -d "$candidate" ] && [ ! -L "$candidate" ] || continue
+        rm -rf -- "$candidate" || return 1
+    done
+}
+
 fetch_ffmpeg() {
     local archive="ffmpeg-${FFMPEG_VERSION}.tar.xz"
     if [ ! -f "$archive" ]; then

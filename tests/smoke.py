@@ -83,7 +83,10 @@ def pause_resume(ffmpeg, directory, terminate=False):
     print(f"PASS pause/resume and {'SIGTERM' if terminate else 'q'} while paused")
 
 
-def hls(ffmpeg, ffprobe, directory):
+def hls(ffmpeg, ffprobe, directory, segment_type):
+    directory = directory / segment_type
+    directory.mkdir()
+    extension = "m4s" if segment_type == "fmp4" else "ts"
     playlist = directory / "stream.m3u8"
     run(ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-f", "lavfi", "-i", "testsrc2=size=160x96:rate=25",
@@ -91,20 +94,38 @@ def hls(ffmpeg, ffprobe, directory):
         "-threads", "1", "-c:v", "libx264", "-preset", "ultrafast",
         "-g", "25", "-sc_threshold", "0", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-f", "hls", "-hls_time", "1",
-        "-hls_segment_type", "fmp4", "-hls_flags", "independent_segments",
-        "-hls_segment_filename", str(directory / "seg%03d.m4s"), str(playlist))
-    assert len(list(directory.glob("seg*.m4s"))) == 3
+        "-hls_segment_type", segment_type, "-hls_flags", "independent_segments",
+        "-hls_segment_filename", str(directory / f"seg%03d.{extension}"), str(playlist))
+    segments = sorted(directory.glob(f"seg*.{extension}"))
+    assert len(segments) == 3
     streams = json.loads(run(ffprobe, "-v", "error", "-show_streams",
                              "-of", "json", str(playlist)))["streams"]
     assert {s["codec_name"] for s in streams} == {"h264", "aac"}
     run(ffmpeg, "-v", "error", "-xerror", "-nostdin", "-i", str(playlist),
         "-f", "null", "-")
-    print("PASS H.264/AAC fMP4 HLS, ffprobe JSON and full decode")
+    if segment_type == "mpegts":
+        # Every segment must start at a keyframe and decode on its own after a seek
+        for segment in segments:
+            frames = json.loads(run(ffprobe, "-v", "error", "-select_streams", "v:0",
+                                    "-show_frames", "-show_entries", "frame=key_frame",
+                                    "-of", "json", str(segment)))["frames"]
+            assert frames and frames[0]["key_frame"] == 1
+            run(ffmpeg, "-v", "error", "-xerror", "-nostdin", "-i", str(segment),
+                "-f", "null", "-")
+        run(ffmpeg, "-v", "error", "-xerror", "-nostdin", "-ss", "1.1",
+            "-i", str(playlist), "-frames:v", "2", "-f", "null", "-")
+    print(f"PASS H.264/AAC {segment_type} HLS, ffprobe JSON and decode/seek")
 
 
 def gpu(ffmpeg, ffprobe, directory):
     filters = run(ffmpeg, "-hide_banner", "-filters")
     assert "tonemap_cuda" in filters and "scale_cuda" in filters
+    run(ffmpeg, "-v", "error", "-nostdin", "-init_hw_device", "cuda=gpu:0",
+        "-filter_hw_device", "gpu", "-f", "lavfi", "-i",
+        "testsrc2=size=160x96:rate=25:duration=0.2", "-vf",
+        "format=nv12,hwupload,scale_cuda=160:96:format=yuv420p,select=0",
+        "-c:v", "h264_nvenc", "-f", "null", "-")
+    print("PASS empty CUDA/NVENC output retains its hardware frame context")
     # Covers the upstream two-pass scaler and our luma dithering in every interpolation mode
     for algorithm in ("nearest", "bilinear", "bicubic", "lanczos"):
         for dimensions in ("160:96", "320:192"):
@@ -158,7 +179,8 @@ def main():
         directory = pathlib.Path(tmp)
         pause_resume(args.ffmpeg, directory)
         pause_resume(args.ffmpeg, directory, terminate=True)
-        hls(args.ffmpeg, args.ffprobe, directory)
+        for segment_type in ("mpegts", "fmp4"):
+            hls(args.ffmpeg, args.ffprobe, directory, segment_type)
         if args.gpu:
             gpu(args.ffmpeg, args.ffprobe, directory)
 
