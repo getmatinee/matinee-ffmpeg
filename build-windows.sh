@@ -9,6 +9,7 @@
 set -euo pipefail
 
 . "$(dirname "$0")/versions.env"
+. "$(dirname "$0")/common.sh"
 FREETYPE_VERSION="${FREETYPE_VERSION:-2.13.3}"
 FRIBIDI_VERSION="${FRIBIDI_VERSION:-1.0.16}"
 HARFBUZZ_VERSION="${HARFBUZZ_VERSION:-10.1.0}"
@@ -257,14 +258,10 @@ git clone --quiet --depth 1 --branch "$NVCODEC_VERSION" \
     https://github.com/FFmpeg/nv-codec-headers.git
 make -C nv-codec-headers install PREFIX="$prefix"
 
-fetch "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" ffmpeg.tar.xz
-untar ffmpeg.tar.xz ffmpeg
+rm -rf ffmpeg
+fetch_ffmpeg
 cd ffmpeg
-
-while read -r patchfile; do
-    [ -n "$patchfile" ] || continue
-    patch -p1 --no-backup-if-mismatch < "$PATCHDIR/$patchfile"
-done < "$PATCHDIR/series"
+apply_patch_series "$PATCHDIR"
 
 ./configure \
     --prefix=/ffmpeg \

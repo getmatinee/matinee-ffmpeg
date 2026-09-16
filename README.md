@@ -1,8 +1,8 @@
 # matinee-ffmpeg
 
-This repository is the single source of truth for ffmpeg compilations or patchings in the Matinee ecosystem. All currently applied patches on top of the stock ffmpeg is found here: [`patches/`](patches/).
+Build scripts and patches for Matinee's FFmpeg distribution. The maintained patch series is available in [`patches/`](patches/).
 
-The ffmpeg and codec sources are downloaded from their upstreams at the version pinned here.
+FFmpeg and codec sources are downloaded from their upstream projects at the versions pinned in this repository.
 
 The following scripts are also part of this repo:
 
@@ -29,12 +29,25 @@ Upstream FFmpeg as a GPL build (no `--enable-nonfree`, no libfdk and no libnpp),
 
 ## Base image
 
-Debian trixie (glibc) -> Alpine cannot be used becaus NVIDIA's runtime driver libraries are glibc-only and NVIDIA does not support musl, so NVENC/NVDEC can never load there regardless of how FFmpeg is compiled.
+The container uses Debian trixie, which is built on glibc. Alpine cannot be used, because NVIDIA's runtime driver libraries are glibc-only and NVIDIA does not support musl, so NVENC and NVDEC can never load there however FFmpeg is compiled.
 
 ## Versions
 
-Pinned once in [`versions.env`](versions.env), sourced by all three build
-scripts.
+Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.1**, with a SHA-256 pin checked before extraction on every platform. Windows caches the archive by version so an existing `WORKDIR` cannot silently reuse an older FFmpeg tarball. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
+
+## Validation
+
+Run `bash validate.sh --patches` to verify the release checksum, exact patch application (no offsets or fuzz), and shell syntax. `bash validate.sh --cpu` also builds a small FFmpeg and checks pause/resume, shutdown while paused, HLS playback, mapped software frames, and ASS headers. The CPU build needs a C toolchain, pkg-config, nasm, libx264 development files, and Python 3. CI runs this suite.
+
+To use an already downloaded archive, set `FFMPEG_SOURCE_ARCHIVE` to its absolute path. To test a complete production build, run:
+
+```bash
+python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe
+# Also exercise CUDA scaling and PQ/HLG NVDEC -> tone mapping -> NVENC:
+python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe --gpu
+```
+
+The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It fails if the pipeline cannot run.
 
 ## Container image
 
@@ -57,7 +70,7 @@ podman run --rm matinee-ffmpeg:local sh -c '\
 
 ## Credits
 
-Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), whose maintainers had already solved problems we also ran into with FFmpeg and streaming -> the NVDEC surface clamp, the cooperative CLI pause, and the CUDA tone-mapping stack. Thanks to them. The patches are derived works of FFmpeg and stay under FFmpeg's GPL/LGPL licensing.
+Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), whose maintainers had already solved problems we also ran into with FFmpeg and streaming, namely the cooperative CLI pause, the CUDA tone-mapping stack and several subtitle and hardware-frame fixes and so on. Thanks to them. The patches are derived works of FFmpeg and stay under FFmpeg's GPL/LGPL licensing.
 
 ## Support the project
 
@@ -65,4 +78,4 @@ Matinee is free software, funded by sponsorship through [GitHub Sponsors](https:
 
 ## License
 
-AGPL-3.0-or-later for the build scripts in this repository. The patches stay under FFmpeg's own GPL/LGPL licensing, and the resulting FFmpeg builds are GPL-3.0-or-later (GPL with the version3 option, no nonfree components).
+Build scripts are licensed under AGPL-3.0-or-later. Patches retain the licenses of the files they modify, including GPL, LGPL and MIT. The resulting FFmpeg builds are GPL-3.0-or-later (`--enable-gpl --enable-version3`, without nonfree components).
