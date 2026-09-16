@@ -126,6 +126,18 @@ def gpu(ffmpeg, ffprobe, directory):
         "format=nv12,hwupload,scale_cuda=160:96:format=yuv420p,select=0",
         "-c:v", "h264_nvenc", "-f", "null", "-")
     print("PASS empty CUDA/NVENC output retains its hardware frame context")
+    # Sharing the main frame forces overlay_cuda to allocate a writable copy from its aligned pool
+    for height in (180, 360, 720, 1080):
+        output = directory / f"cuda-overlay-{height}.mp4"
+        run(ffmpeg, "-v", "error", "-nostdin", "-y", "-init_hw_device", "cuda=gpu:0",
+            "-filter_hw_device", "gpu", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=25",
+            "-filter_complex", f"format=nv12,hwupload,scale_cuda=-2:{height}:format=yuv420p,"
+            "split[main][copy];[main][copy]overlay_cuda[out]",
+            "-map", "[out]", "-frames:v", "4", "-c:v", "h264_nvenc", str(output))
+        stream = json.loads(run(ffprobe, "-v", "error", "-show_streams", "-of", "json", str(output)))["streams"][0]
+        assert stream["height"] == height, stream
+        assert stream["width"] == round(height * 16 / 9 / 2) * 2, stream
+    print("PASS CUDA overlay copies preserve visible dimensions rather than hardware pool padding")
     # Covers the upstream two-pass scaler and our luma dithering in every interpolation mode
     for algorithm in ("nearest", "bilinear", "bicubic", "lanczos"):
         for dimensions in ("160:96", "320:192"):

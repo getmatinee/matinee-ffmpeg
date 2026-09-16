@@ -48,7 +48,7 @@ Moving a checkout does not change the dependency key. Prefixes are retained so s
 | Mode | Checks | Requires |
 |---|---|---|
 | `--patches` | Release checksum, exact patch application with no offsets or fuzz, shell syntax, download-cache behavior. | Nothing beyond a shell and `curl`. |
-| `--cpu` | Builds a small FFmpeg, then checks pause and resume, shutdown while paused, MPEG-TS and fMP4 HLS, independent segment decoding and seeking, ASS bounds, and queued subtitle EOF. | A C toolchain, pkg-config, nasm, libx264 development files, Python 3. |
+| `--cpu` | Builds a small FFmpeg, then checks pause and resume, shutdown while paused, MPEG-TS and fMP4 HLS, independent segment decoding and seeking, ASS bounds, queued subtitle EOF, and hardware buffer dimensions using a simulated allocator. | A C toolchain, pkg-config, nasm, libx264 development files, Python 3. |
 | `--cuda` | Compiles the CUDA patches and checks partial texture-allocation cleanup against simulated driver calls. Runs without a GPU. | The `--cpu` requirements plus clang, git. |
 
 To use an already downloaded archive, set `FFMPEG_SOURCE_ARCHIVE` to its absolute path. To test a complete production build, run:
@@ -59,7 +59,7 @@ python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe
 python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe --gpu
 ```
 
-The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It also checks empty hardware output and fails if a required pipeline cannot run. To verify error propagation, run `python3 tests/cuda_faults.py /path/to/configured-ffmpeg-build`: it rebuilds instrumented copies in a temporary directory and requires the production build dependencies and a working NVIDIA GPU.
+The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It also checks empty hardware output and the visible dimensions of shared frames composited by `overlay_cuda`, and fails if a required pipeline cannot run. To verify error propagation, run `python3 tests/cuda_faults.py /path/to/configured-ffmpeg-build`: it rebuilds instrumented copies in a temporary directory and requires the production build dependencies and a working NVIDIA GPU.
 
 The image workflow runs validation before publishing and exercises the produced binaries for both architectures. Hardware runtime checks still require the matching devices.
 

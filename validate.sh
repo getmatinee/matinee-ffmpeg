@@ -60,6 +60,10 @@ cc -I. -ffunction-sections -fdata-sections "$repo/tests/subtitle_eof.c" \
     -Wl,--gc-sections -o "$workdir/subtitle_eof" \
     $(pkg-config --cflags --libs --static libavfilter libavformat libavcodec libavutil)
 "$workdir/subtitle_eof"
+cc -I. -ffunction-sections -fdata-sections "$repo/tests/hw_frame_dimensions.c" \
+    -Wl,--gc-sections -o "$workdir/hw_frame_dimensions" \
+    $(pkg-config --cflags --libs --static libavfilter libavformat libavcodec libavutil)
+"$workdir/hw_frame_dimensions"
 if [ "$mode" = --cuda ]; then
     cc -I. "$repo/tests/cuda_cleanup.c" -o "$workdir/cuda_cleanup" \
         $(pkg-config --cflags --libs --static libavutil ffnvcodec)

@@ -6,3 +6,4 @@ matinee-0006-cuda-tonemap.patch
 matinee-0007-ass-header.patch
 matinee-0008-hw-empty-output.patch
 matinee-0012-subtitle-eof.patch
+matinee-0014-hw-frame-dimensions.patch
