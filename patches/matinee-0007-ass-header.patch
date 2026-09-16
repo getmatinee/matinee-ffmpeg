@@ -1,0 +1,28 @@
+--- a/libavformat/assenc.c
++++ b/libavformat/assenc.c
+@@ -53,7 +53,7 @@
+ 
+     avpriv_set_pts_info(s->streams[0], 64, 1, 100);
+     if (par->extradata_size > 0) {
+-        size_t header_size = par->extradata_size;
++        size_t header_size = av_strnlen(par->extradata, par->extradata_size);
+         uint8_t *trailer = strstr(par->extradata, "\n[Events]");
+ 
+         if (trailer)
+@@ -62,13 +62,13 @@
+             trailer = strstr(trailer, "\n");
+ 
+         if (trailer) {
+-            header_size = (++trailer - par->extradata);
+-            ass->trailer_size = par->extradata_size - header_size;
++            ass->trailer_size = header_size - (++trailer - par->extradata);
++            header_size -= ass->trailer_size;
+             if (ass->trailer_size)
+                 ass->trailer = trailer;
+         }
+ 
+-        ffio_write_lines(s->pb, par->extradata, header_size, NULL);
++        ffio_write_lines(s->pb, par->extradata, (int)header_size, NULL);
+ 
+         ass->ssa_mode = !strstr(par->extradata, "\n[V4+ Styles]");
+         if (!strstr(par->extradata, "\n[Events]"))

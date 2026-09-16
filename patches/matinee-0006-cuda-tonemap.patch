@@ -1,15 +1,15 @@
 --- a/configure
 +++ b/configure
-@@ -3522,6 +3522,8 @@ scale_cuda_filter_deps="ffnvcodec"
+@@ -3579,6 +3579,8 @@
  scale_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
  thumbnail_cuda_filter_deps="ffnvcodec"
  thumbnail_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
 +tonemap_cuda_filter_deps="ffnvcodec const_nan"
 +tonemap_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
- transpose_npp_filter_deps="ffnvcodec libnpp"
+ transpose_cuda_filter_deps="ffnvcodec"
+ transpose_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
  overlay_cuda_filter_deps="ffnvcodec"
- overlay_cuda_filter_deps_any="cuda_nvcc cuda_llvm"
-@@ -4987,6 +4989,15 @@ if enabled cuda_nvcc; then
+@@ -5060,6 +5062,15 @@
      if $nvcc $nvccflags_default 2>&1 | grep -qi unsupported; then
          nvccflags_default="-gencode arch=compute_75,code=sm_75 -O2"
      fi
@@ -25,7 +25,7 @@
  fi
  
  set_default arch cc cxx doxygen pkg_config ranlib strip sysinclude \
-@@ -7117,7 +7128,7 @@ fi
+@@ -7205,7 +7216,7 @@
  if enabled cuda_nvcc; then
      nvccflags="$nvccflags -ptx"
  else
@@ -36,7 +36,7 @@
  
 --- a/ffbuild/common.mak
 +++ b/ffbuild/common.mak
-@@ -53,6 +53,7 @@ ASFLAGS    := $(CPPFLAGS) $(ASFLAGS)
+@@ -45,6 +45,7 @@
  # end up in CXXFLAGS.
  $(call PREPEND,CXXFLAGS, CPPFLAGS)
  X86ASMFLAGS += $(IFLAGS:%=%/) -I$(<D)/ -Pconfig.asm
@@ -46,7 +46,7 @@
  LDFLAGS    := $(ALLFFLIBS:%=$(LD_PATH)lib%) $(LDFLAGS)
 --- a/libavfilter/Makefile
 +++ b/libavfilter/Makefile
-@@ -541,6 +541,8 @@ OBJS-$(CONFIG_TMEDIAN_FILTER)
+@@ -538,6 +538,8 @@
  OBJS-$(CONFIG_TMIDEQUALIZER_FILTER)          += vf_tmidequalizer.o
  OBJS-$(CONFIG_TMIX_FILTER)                   += vf_mix.o framesync.o
  OBJS-$(CONFIG_TONEMAP_FILTER)                += vf_tonemap.o
@@ -57,7 +57,7 @@
  OBJS-$(CONFIG_TONEMAP_VAAPI_FILTER)          += vf_tonemap_vaapi.o vaapi_vpp.o
 --- a/libavfilter/allfilters.c
 +++ b/libavfilter/allfilters.c
-@@ -509,6 +509,7 @@ extern const FFFilter ff_vf_tmedian;
+@@ -507,6 +507,7 @@
  extern const FFFilter ff_vf_tmidequalizer;
  extern const FFFilter ff_vf_tmix;
  extern const FFFilter ff_vf_tonemap;
@@ -67,10 +67,13 @@
  extern const FFFilter ff_vf_tpad;
 --- a/libavfilter/colorspace.c
 +++ b/libavfilter/colorspace.c
-@@ -51,6 +51,18 @@ void ff_matrix_invert_3x3(const double i
-     }
- }
- 
+@@ -48,6 +48,18 @@
+     for (i = 0; i < 3; i++) {
+         for (j = 0; j < 3; j++)
+             out[i][j] *= det;
++    }
++}
++
 +void ff_matrix_transpose_3x3(const double in[3][3], double out[3][3])
 +{
 +    int i, j;
@@ -80,13 +83,10 @@
 +    for (i = 0; i < 3; i++) {
 +        for (j = 0; j < 3; j++)
 +            out_p[i * 3 + j] = in_p[j * 3 + i];
-+    }
-+}
-+
- void ff_matrix_mul_3x3(double dst[3][3],
-                const double src1[3][3], const double src2[3][3])
- {
-@@ -191,3 +203,162 @@ void ff_update_hdr_metadata(AVFrame *in,
+     }
+ }
+ 
+@@ -191,3 +203,162 @@
              metadata->max_luminance = av_d2q(peak * REFERENCE_WHITE, 10000);
      }
  }
@@ -323,7 +323,7 @@
  void ff_matrix_mul_3x3(double dst[3][3],
                 const double src1[3][3], const double src2[3][3]);
  void ff_matrix_mul_3x3_vec(double dst[3], const double vec[3], const double mat[3][3]);
-@@ -38,4 +99,14 @@ void ff_fill_rgb2yuv_table(const AVLumaC
+@@ -38,4 +99,14 @@
  double ff_determine_signal_peak(AVFrame *in);
  void ff_update_hdr_metadata(AVFrame *in, double peak);
  
@@ -825,20 +825,18 @@
  #if CONFIG_SHADER_COMPRESSION
      uint8_t *out;
      size_t out_len;
-@@ -44,10 +42,51 @@ int ff_cuda_load_module(void *avctx, AVC
+@@ -44,10 +42,51 @@
      if (ret < 0)
          return ret;
  
 -    ret = CHECK_CU(cu->cuModuleLoadData(cu_module, out));
 -    av_free(out);
--    return ret;
 +    *data_out   = out;
 +    *length_out = out_len;
- #else
--    return CHECK_CU(cu->cuModuleLoadData(cu_module, data));
++#else
 +    *data_out   = NULL;
 +    *length_out = 0;
- #endif
++#endif
 +    return 0;
 +}
 +
@@ -857,8 +855,11 @@
 +exit:
 +    if (data_out)
 +        av_free(data_out);
-+    return ret;
-+}
+     return ret;
+-#else
+-    return CHECK_CU(cu->cuModuleLoadData(cu_module, data));
+-#endif
+ }
 +
 +int ff_cuda_link_add_data(void *avctx, AVCUDADeviceContext *hwctx,
 +                          CUlinkState state, const char* name,
@@ -880,7 +881,7 @@
 +    if (data_out)
 +        av_free(data_out);
 +    return ret;
- }
++}
 --- a/libavfilter/cuda/load_helper.h
 +++ b/libavfilter/cuda/load_helper.h
 @@ -25,4 +25,11 @@

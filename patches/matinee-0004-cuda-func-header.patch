@@ -16,43 +16,6 @@
 -{
 -    unsigned char x, y;
 -} uchar2;
--
--typedef struct __device_builtin__ __align__(4) ushort2
--{
--    unsigned short x, y;
--} ushort2;
--
--typedef struct __device_builtin__ __align__(8) float2
--{
--    float x, y;
--} float2;
--
--typedef struct __device_builtin__ __align__(8) int2
--{
--    int x, y;
--} int2;
--
--typedef struct __device_builtin__ uint3
--{
--    unsigned int x, y, z;
--} uint3;
--
--typedef struct uint3 dim3;
--
--typedef struct __device_builtin__ __align__(4) uchar4
--{
--    unsigned char x, y, z, w;
--} uchar4;
--
--typedef struct __device_builtin__ __align__(8) ushort4
--{
--    unsigned short x, y, z, w;
--} ushort4;
--
--typedef struct __device_builtin__ __align__(16) int4
--{
--    int x, y, z, w;
--} int4;
 +#define MAKE_VECTORS(type, base) \
 +typedef struct __device_builtin__ type##1 { \
 +    base x; \
@@ -93,6 +56,43 @@
 +    return ret; \
 +}
  
+-typedef struct __device_builtin__ __align__(4) ushort2
+-{
+-    unsigned short x, y;
+-} ushort2;
+-
+-typedef struct __device_builtin__ __align__(8) float2
+-{
+-    float x, y;
+-} float2;
+-
+-typedef struct __device_builtin__ __align__(8) int2
+-{
+-    int x, y;
+-} int2;
+-
+-typedef struct __device_builtin__ uint3
+-{
+-    unsigned int x, y, z;
+-} uint3;
+-
+-typedef struct uint3 dim3;
+-
+-typedef struct __device_builtin__ __align__(4) uchar4
+-{
+-    unsigned char x, y, z, w;
+-} uchar4;
+-
+-typedef struct __device_builtin__ __align__(8) ushort4
+-{
+-    unsigned short x, y, z, w;
+-} ushort4;
+-
+-typedef struct __device_builtin__ __align__(16) int4
+-{
+-    int x, y, z, w;
+-} int4;
+-
 -typedef struct __device_builtin__ __align__(16) float4
 -{
 -    float x, y, z, w;
@@ -114,7 +114,7 @@
      uint3 ret; \
      unsigned tmp; \
      GETCOMP(reg, x) \
-@@ -109,18 +110,8 @@ GET(getThreadIdx, tid)
+@@ -109,18 +110,8 @@
  #define blockDim (getBlockDim())
  #define threadIdx (getThreadIdx())
  
@@ -134,7 +134,7 @@
  
  TEX2D(unsigned char, a & 0xFF)
  TEX2D(unsigned short, a & 0xFFFF)
-@@ -134,19 +125,19 @@ TEX2D(float4, make_float4(a, b, c, d))
+@@ -134,19 +125,19 @@
  
  // Template calling tex instruction and converting the output to the selected type
  template<typename T>
@@ -163,68 +163,15 @@
  {
      float4 ret;
      asm("tex.2d.v4.f32.f32 {%0, %1, %2, %3}, [%4, {%5, %6}];" :
-@@ -156,38 +147,43 @@ inline __device__ float4 tex2D<float4>(c
- }
+@@ -190,6 +181,11 @@
+ static inline __device__ float __expf(float a) { return __nvvm_ex2_approx_f(a * (float)__builtin_log2(__builtin_exp(1))); }
+ static inline __device__ float __powf(float a, float b) { return __nvvm_ex2_approx_f(__nvvm_lg2_approx_f(a) * b); }
  
- template<>
--inline __device__ float tex2D<float>(cudaTextureObject_t texObject, float x, float y)
-+__inline__ __device__ float tex2D<float>(cudaTextureObject_t texObject, float x, float y)
- {
-     return tex2D<float4>(texObject, x, y).x;
- }
- 
- template<>
--inline __device__ float2 tex2D<float2>(cudaTextureObject_t texObject, float x, float y)
-+__inline__ __device__ float2 tex2D<float2>(cudaTextureObject_t texObject, float x, float y)
- {
-     float4 ret = tex2D<float4>(texObject, x, y);
-     return make_float2(ret.x, ret.y);
- }
- 
- // Math helper functions
--static inline __device__ float floorf(float a) { return __builtin_floorf(a); }
--static inline __device__ float floor(float a) { return __builtin_floorf(a); }
--static inline __device__ double floor(double a) { return __builtin_floor(a); }
--static inline __device__ float ceilf(float a) { return __builtin_ceilf(a); }
--static inline __device__ float ceil(float a) { return __builtin_ceilf(a); }
--static inline __device__ double ceil(double a) { return __builtin_ceil(a); }
--static inline __device__ float truncf(float a) { return __builtin_truncf(a); }
--static inline __device__ float trunc(float a) { return __builtin_truncf(a); }
--static inline __device__ double trunc(double a) { return __builtin_trunc(a); }
--static inline __device__ float fabsf(float a) { return __builtin_fabsf(a); }
--static inline __device__ float fabs(float a) { return __builtin_fabsf(a); }
--static inline __device__ double fabs(double a) { return __builtin_fabs(a); }
--static inline __device__ float sqrtf(float a) { return __builtin_sqrtf(a); }
--
--static inline __device__ float __saturatef(float a) { return __nvvm_saturate_f(a); }
--static inline __device__ float __sinf(float a) { return __nvvm_sin_approx_f(a); }
--static inline __device__ float __cosf(float a) { return __nvvm_cos_approx_f(a); }
--static inline __device__ float __expf(float a) { return __nvvm_ex2_approx_f(a * (float)__builtin_log2(__builtin_exp(1))); }
--static inline __device__ float __powf(float a, float b) { return __nvvm_ex2_approx_f(__nvvm_lg2_approx_f(a) * b); }
-+static __inline__ __device__ float floorf(float a) { return __builtin_floorf(a); }
-+static __inline__ __device__ float floor(float a) { return __builtin_floorf(a); }
-+static __inline__ __device__ double floor(double a) { return __builtin_floor(a); }
-+static __inline__ __device__ float ceilf(float a) { return __builtin_ceilf(a); }
-+static __inline__ __device__ float ceil(float a) { return __builtin_ceilf(a); }
-+static __inline__ __device__ double ceil(double a) { return __builtin_ceil(a); }
-+static __inline__ __device__ float truncf(float a) { return __builtin_truncf(a); }
-+static __inline__ __device__ float trunc(float a) { return __builtin_truncf(a); }
-+static __inline__ __device__ double trunc(double a) { return __builtin_trunc(a); }
-+static __inline__ __device__ float fabsf(float a) { return __builtin_fabsf(a); }
-+static __inline__ __device__ float fabs(float a) { return __builtin_fabsf(a); }
-+static __inline__ __device__ double fabs(double a) { return __builtin_fabs(a); }
-+static __inline__ __device__ float sqrtf(float a) { return __builtin_sqrtf(a); }
-+static __inline__ __device__ float rintf(float a) { return __builtin_rintf(a); }
++static inline __device__ float __exp2f(float a) { return __nvvm_ex2_approx_f(a); }
++static inline __device__ float __log2f(float a) { return __nvvm_lg2_approx_f(a); }
++static inline __device__ float __logf(float a) { return __nvvm_lg2_approx_f(a) * 0.693147f; }
++static inline __device__ float __log10f(float a) { return __nvvm_lg2_approx_f(a) * 0.30103f; }
 +
-+static __inline__ __device__ float __saturatef(float a) { return __nvvm_saturate_f(a); }
-+static __inline__ __device__ float __sinf(float a) { return __nvvm_sin_approx_f(a); }
-+static __inline__ __device__ float __cosf(float a) { return __nvvm_cos_approx_f(a); }
-+static __inline__ __device__ float __exp2f(float a) { return __nvvm_ex2_approx_f(a); }
-+static __inline__ __device__ float __expf(float a) { return __nvvm_ex2_approx_f(a * 1.4427f); }
-+static __inline__ __device__ float __log2f(float a) { return __nvvm_lg2_approx_f(a); }
-+static __inline__ __device__ float __logf(float a) { return __nvvm_lg2_approx_f(a) * 0.693147f; }
-+static __inline__ __device__ float __log10f(float a) { return __nvvm_lg2_approx_f(a) * 0.30103f; }
-+static __inline__ __device__ float __powf(float a, float b) { return __nvvm_ex2_approx_f(__nvvm_lg2_approx_f(a) * b); }
- 
  // Misc helper functions
  extern "C" __device__ int printf(const char*, ...);
+ 
