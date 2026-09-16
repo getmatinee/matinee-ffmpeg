@@ -18,14 +18,14 @@ The packaging repos fetch this repository alongside the server and web sources a
 
 Upstream FFmpeg as a GPL build (no `--enable-nonfree`, no libfdk and no libnpp), so it stays redistributable and compatible with Matinee's AGPL-3.0 license.
 
-- **NVIDIA full pipeline** -> (`ffnvcodec`, `cuda`, `cuda-llvm`, `cuvid`, `nvdec`, `nvenc`) hardware decode (NVDEC), CUDA filters (`scale_cuda`, and `tonemap_cuda` for HDR->SDR), and hardware encode (`h264_nvenc`, `hevc_nvenc`). `--enable-cuda-llvm` compiles the CUDA filter kernels with clang, so **no CUDA SDK** is needed. The NVIDIA driver's encode/decode libraries are provided at runtime by the NVIDIA Container Toolkit
-- **VAAPI** (`vaapi`, `libdrm`, `opencl`) `h264_vaapi` and OpenCL filters for AMD/Intel.
-- **Intel Quick Sync** (`libvpl`) `h264_qsv` and `scale_qsv` through the oneVPL dispatcher. Intel ships oneVPL for x86_64 only, so `add_qsv_flag` in `common.sh` adds the flag when the host is x86_64 and the dispatcher is present and builds without it otherwise, which keeps the arm64 legs of the multi-arch manifest working. The Windows script cross-builds the dispatcher itself and does not share the flag list.
-- **x264/x265 libraries** (`libx264`, `libx265`) -> `libx264` is the software-fallback encoder and `libx265` is ready for HEVC output
-- **AV1 and scaling** (`libdav1d`, `libsvtav1`, `libzimg`) efficient AV1 decode/encode and scaling
-- **Subtitles** (`libass`, `libfreetype`, `libfontconfig`, `libfribidi`, `libharfbuzz`) for subtitle burn-in
-- **Audio** (`libopus`, `libmp3lame`, `libvorbis`)
-- **Images / misc** (`libwebp`, `libvpx`, `chromaprint`).
+- **NVIDIA full pipeline** (`ffnvcodec`, `cuda`, `cuda-llvm`, `cuvid`, `nvdec`, `nvenc`) gives hardware decode through NVDEC, the CUDA filters `scale_cuda` and `tonemap_cuda` for HDR to SDR, and hardware encode through `h264_nvenc` and `hevc_nvenc`. `--enable-cuda-llvm` compiles the CUDA filter kernels with clang, so no CUDA SDK is needed. The NVIDIA driver's encode and decode libraries are provided at runtime by the NVIDIA Container Toolkit.
+- **VAAPI** (`vaapi`, `libdrm`, `opencl`) gives `h264_vaapi` and OpenCL filters on AMD and Intel.
+- **Intel Quick Sync** (`libvpl`) gives `h264_qsv` and `scale_qsv` through the oneVPL dispatcher. Intel ships oneVPL for x86_64 only, so `add_qsv_flag` in `common.sh` adds the flag when the host is x86_64 and the dispatcher is present and builds without it otherwise, which keeps the arm64 legs of the multi-arch manifest working. The Windows script cross-builds the dispatcher itself and does not share the flag list.
+- **x264 and x265 libraries** (`libx264`, `libx265`) provide the software fallback encoder and HEVC output.
+- **AV1 and scaling** (`libdav1d`, `libsvtav1`, `libzimg`) provide AV1 decode and encode, and software scaling.
+- **Subtitles** (`libass`, `libfreetype`, `libfontconfig`, `libfribidi`, `libharfbuzz`) provide the `subtitles` and `ass` filters, which render text subtitles onto video.
+- **Audio** (`libopus`, `libmp3lame`, `libvorbis`) adds the Opus, MP3 and Vorbis encoders alongside FFmpeg's own AAC encoder.
+- **Images and fingerprinting** (`libwebp`, `libvpx`, `chromaprint`) add WebP output for trickplay tiles, VP8 and VP9, and the chromaprint muxer for audio fingerprints.
 
 ## Base image
 
@@ -33,11 +33,23 @@ The container uses Debian trixie, which is built on glibc. Alpine cannot be used
 
 ## Versions
 
-Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.1**, with a SHA-256 pin checked before extraction on every platform. Windows caches the archive by version so an existing `WORKDIR` cannot silently reuse an older FFmpeg tarball. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
+Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.1**, with a SHA-256 pin checked before extraction on every platform. Windows records each download's URL and content hash, so an existing `WORKDIR` cannot silently reuse a stale or damaged archive. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
+
+## Windows dependency cache
+
+Windows builds with a reusable `WORKDIR` isolate dependency prefixes by version pins, build recipes, compiler version and compiler/linker flags. Download caches record the source URL and content hash; changed or damaged entries are fetched again, and incomplete downloads are never promoted to cache entries.
+
+Moving a checkout does not change the dependency key. Prefixes are retained so switching versions can reuse prior builds. Set `PRUNE_DEPENDENCY_CACHE=1` to remove other generated dependency prefixes after a successful Windows build; the current prefix, downloaded archives and unrelated directories are preserved. Use a separate `WORKDIR` for concurrent builds.
 
 ## Validation
 
-Run `bash validate.sh --patches` to verify the release checksum, exact patch application (no offsets or fuzz), and shell syntax. `bash validate.sh --cpu` also builds a small FFmpeg and checks pause/resume, shutdown while paused, HLS playback, mapped software frames, and ASS headers. The CPU build needs a C toolchain, pkg-config, nasm, libx264 development files, and Python 3. CI runs this suite.
+`validate.sh` takes one mode. Each mode includes the checks of the one above it. CI runs `--cpu` and `--cuda`.
+
+| Mode | Checks | Requires |
+|---|---|---|
+| `--patches` | Release checksum, exact patch application with no offsets or fuzz, shell syntax, download-cache behavior. | Nothing beyond a shell and `curl`. |
+| `--cpu` | Builds a small FFmpeg, then checks pause and resume, shutdown while paused, MPEG-TS and fMP4 HLS, independent segment decoding and seeking, ASS bounds, and queued subtitle EOF. | A C toolchain, pkg-config, nasm, libx264 development files, Python 3. |
+| `--cuda` | Compiles the CUDA patches and checks partial texture-allocation cleanup against simulated driver calls. Runs without a GPU. | The `--cpu` requirements plus clang, git. |
 
 To use an already downloaded archive, set `FFMPEG_SOURCE_ARCHIVE` to its absolute path. To test a complete production build, run:
 
@@ -47,7 +59,9 @@ python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe
 python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe --gpu
 ```
 
-The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It fails if the pipeline cannot run.
+The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It also checks empty hardware output and fails if a required pipeline cannot run. To verify error propagation, run `python3 tests/cuda_faults.py /path/to/configured-ffmpeg-build`: it rebuilds instrumented copies in a temporary directory and requires the production build dependencies and a working NVIDIA GPU.
+
+The image workflow runs validation before publishing and exercises the produced binaries for both architectures. Hardware runtime checks still require the matching devices.
 
 ## Container image
 
@@ -70,7 +84,7 @@ podman run --rm matinee-ffmpeg:local sh -c '\
 
 ## Credits
 
-Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), whose maintainers had already solved problems we also ran into with FFmpeg and streaming, namely the cooperative CLI pause, the CUDA tone-mapping stack and several subtitle and hardware-frame fixes and so on. Thanks to them. The patches are derived works of FFmpeg and stay under FFmpeg's GPL/LGPL licensing.
+Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg), whose maintainers had already solved problems we also ran into with FFmpeg and streaming, namely the cooperative CLI pause, the CUDA tone-mapping stack, and several subtitle and hardware-frame fixes. Thanks to them. The patches are derived works of FFmpeg and stay under FFmpeg's GPL/LGPL licensing.
 
 ## Support the project
 

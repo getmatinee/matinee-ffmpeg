@@ -5,5 +5,4 @@ matinee-0005-cuda-pixfmt-converter.patch
 matinee-0006-cuda-tonemap.patch
 matinee-0007-ass-header.patch
 matinee-0008-hw-empty-output.patch
-matinee-0009-swscale-mapped-frames.patch
 matinee-0012-subtitle-eof.patch

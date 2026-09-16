@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ocl-icd-opencl-dev \
         patch \
         pkg-config \
+        python3 \
         xz-utils \
         yasm \
         zstd \

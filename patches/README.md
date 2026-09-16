@@ -12,10 +12,9 @@ The base is **FFmpeg 9.0.1**. The shared build helper rejects reversed patches, 
 | 0003 | Prevent software color conversion between hardware pixel formats. |
 | 0004 | CUDA vector constructors and tone-mapping math helpers. |
 | 0005 | CUDA luma dithering during bit-depth reduction, integrated with upstream scaling and anti-aliasing. |
-| 0006 | GPU tone mapping through `tonemap_cuda`, with color utilities and CUDA runtime linking. |
+| 0006 | GPU tone mapping through `tonemap_cuda`, CUDA runtime linking and checked error/cleanup paths. |
 | 0007 | Remove trailing NUL padding from ASS headers and trailers. |
 | 0008 | Preserve hardware frame contexts for empty video output. |
-| 0009 | Support software frames that retain hardware mapping references in swscale. |
 | 0012 | Preserve queued subtitle end-of-stream signals during filter graph initialization. |
 
 Patch numbers remain stable across releases and retired numbers are not reused.
@@ -23,9 +22,10 @@ Patch numbers remain stable across releases and retired numbers are not reused.
 | Retired | Reason |
 |---|---|
 | 0001 | NVDEC surface handling is included in upstream FFmpeg 9.0.1. |
+| 0009 | Ordinary `hwdownload` output carries no hardware frames context, because `av_frame_copy_props` does not copy one, so no Matinee graph reaches the mapped-frame case. |
 | 0010 | `hwupload` device discovery is already handled by `hw_device_for_filter`, which falls back to the device `-hwaccel` registers. |
 | 0011 | VAAPI MJPEG range support covers an encoder Matinee never invokes, because every image and thumbnail is encoded in software. |
-| 0013 | QSV AV1 HDR side data reaches Matinee through ffprobe rather than the decoder, so exporting it changes nothing. |
+| 0013 | Matinee decodes and tone-maps HDR on the CPU before any QSV upload, so it has no AV1 QSV path that needs this side data exported. |
 
 ## Usage
 
