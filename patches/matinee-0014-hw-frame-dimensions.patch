@@ -1,0 +1,18 @@
+--- a/libavfilter/video.c
++++ b/libavfilter/video.c
+@@ -60,8 +60,14 @@
+             return NULL;
+ 
+         ret = av_hwframe_get_buffer(li->l.hw_frames_ctx, frame, 0);
+-        if (ret < 0)
++        if (ret < 0 || w <= 0 || h <= 0 ||
++            w > frame->width || h > frame->height) {
+             av_frame_free(&frame);
++        } else {
++            /* The pool may include alignment padding outside the visible image. */
++            frame->width  = w;
++            frame->height = h;
++        }
+ 
+         return frame;
+     }

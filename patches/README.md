@@ -16,6 +16,7 @@ The base is **FFmpeg 9.0.1**. The shared build helper rejects reversed patches, 
 | 0007 | Remove trailing NUL padding from ASS headers and trailers. |
 | 0008 | Preserve hardware frame contexts for empty video output. |
 | 0012 | Preserve queued subtitle end-of-stream signals during filter graph initialization. |
+| 0014 | Preserve visible frame dimensions when filters copy aligned hardware buffers, including CUDA subtitle composition. |
 
 Patch numbers remain stable across releases and retired numbers are not reused.
 
