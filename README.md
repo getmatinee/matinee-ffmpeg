@@ -33,7 +33,7 @@ The container uses Debian trixie, which is built on glibc. Alpine cannot be used
 
 ## Versions
 
-Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.1**, with a SHA-256 pin checked before extraction on every platform. Windows records each download's URL and content hash, so an existing `WORKDIR` cannot silently reuse a stale or damaged archive. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
+Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.2**, with a SHA-256 pin checked before extraction on every platform. Windows records each download's URL and content hash, so an existing `WORKDIR` cannot silently reuse a stale or damaged archive. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
 
 ## Windows dependency cache
 

@@ -181,7 +181,7 @@ def main():
     parser.add_argument("ffmpeg")
     parser.add_argument("ffprobe")
     parser.add_argument("--gpu", action="store_true")
-    parser.add_argument("--version", default="9.0.1",
+    parser.add_argument("--version", default="9.0.2",
                         help="expected FFmpeg version, normally from versions.env")
     args = parser.parse_args()
     expected = f"{args.version}-Matinee"
