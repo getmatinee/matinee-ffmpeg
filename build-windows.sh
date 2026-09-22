@@ -11,21 +11,6 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 . "$script_dir/versions.env"
 . "$script_dir/common.sh"
-FREETYPE_VERSION="${FREETYPE_VERSION:-2.13.3}"
-FRIBIDI_VERSION="${FRIBIDI_VERSION:-1.0.16}"
-HARFBUZZ_VERSION="${HARFBUZZ_VERSION:-10.1.0}"
-LIBASS_VERSION="${LIBASS_VERSION:-0.17.3}"
-X265_VERSION="${X265_VERSION:-4.1}"
-DAV1D_VERSION="${DAV1D_VERSION:-1.5.0}"
-SVTAV1_VERSION="${SVTAV1_VERSION:-v2.3.0}"
-ZIMG_VERSION="${ZIMG_VERSION:-release-3.0.5}"
-OPUS_VERSION="${OPUS_VERSION:-1.5.2}"
-LAME_VERSION="${LAME_VERSION:-3.100}"
-OGG_VERSION="${OGG_VERSION:-1.3.5}"
-VORBIS_VERSION="${VORBIS_VERSION:-1.3.7}"
-VPX_VERSION="${VPX_VERSION:-1.15.0}"
-WEBP_VERSION="${WEBP_VERSION:-1.5.0}"
-CHROMAPRINT_VERSION="${CHROMAPRINT_VERSION:-v1.5.1}"
 
 PATCHDIR="${PATCHDIR:?set PATCHDIR to the exported ffmpeg patch series}"
 OUT="${OUT:?set OUT to the output tarball path}"
@@ -38,7 +23,7 @@ mkdir -p "$workdir"
 workdir="$(cd "$workdir" && pwd)"
 dependency_key="$({
     declare -p FREETYPE_VERSION FRIBIDI_VERSION HARFBUZZ_VERSION LIBASS_VERSION \
-        X265_VERSION DAV1D_VERSION SVTAV1_VERSION ZIMG_VERSION OPUS_VERSION \
+        X264_REF X265_VERSION DAV1D_VERSION SVTAV1_VERSION ZIMG_VERSION OPUS_VERSION \
         LAME_VERSION OGG_VERSION VORBIS_VERSION VPX_VERSION WEBP_VERSION \
         CHROMAPRINT_VERSION VPL_VERSION NVCODEC_VERSION
     printf '%s\n' "$HOST" "${CFLAGS:-}" "${CXXFLAGS:-}" "${LDFLAGS:-}"
@@ -79,10 +64,6 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 EOF
 
-fetch() {
-    fetch_cached "$@"
-}
-
 untar() {
     rm -rf "$2"
     mkdir -p "$2"
@@ -90,7 +71,7 @@ untar() {
 }
 
 build_freetype() {
-    fetch "https://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.xz" freetype.tar.xz
+    fetch_cached "https://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VERSION}.tar.xz" freetype.tar.xz
     untar freetype.tar.xz freetype
     cmake -S freetype -B freetype/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
@@ -103,7 +84,7 @@ build_freetype() {
 }
 
 build_fribidi() {
-    fetch "https://github.com/fribidi/fribidi/releases/download/v${FRIBIDI_VERSION}/fribidi-${FRIBIDI_VERSION}.tar.xz" fribidi.tar.xz
+    fetch_cached "https://github.com/fribidi/fribidi/releases/download/v${FRIBIDI_VERSION}/fribidi-${FRIBIDI_VERSION}.tar.xz" fribidi.tar.xz
     untar fribidi.tar.xz fribidi
     meson setup fribidi/build fribidi --cross-file cross.meson \
         --prefix "$prefix" --default-library static \
@@ -112,7 +93,7 @@ build_fribidi() {
 }
 
 build_harfbuzz() {
-    fetch "https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VERSION}/harfbuzz-${HARFBUZZ_VERSION}.tar.xz" harfbuzz.tar.xz
+    fetch_cached "https://github.com/harfbuzz/harfbuzz/releases/download/${HARFBUZZ_VERSION}/harfbuzz-${HARFBUZZ_VERSION}.tar.xz" harfbuzz.tar.xz
     untar harfbuzz.tar.xz harfbuzz
     meson setup harfbuzz/build harfbuzz --cross-file cross.meson \
         --prefix "$prefix" --default-library static \
@@ -122,7 +103,7 @@ build_harfbuzz() {
 }
 
 build_libass() {
-    fetch "https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz" libass.tar.xz
+    fetch_cached "https://github.com/libass/libass/releases/download/${LIBASS_VERSION}/libass-${LIBASS_VERSION}.tar.xz" libass.tar.xz
     untar libass.tar.xz libass
     (cd libass && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared --disable-fontconfig \
@@ -131,27 +112,29 @@ build_libass() {
 
 build_x264() {
     rm -rf x264
-    git clone --quiet --depth 1 --branch stable \
-        https://code.videolan.org/videolan/x264.git
+    git init --quiet x264
+    git -C x264 fetch --quiet --depth 1 https://code.videolan.org/videolan/x264.git "$X264_REF"
+    git -C x264 checkout --quiet --detach FETCH_HEAD
     (cd x264 && ./configure --host="$HOST" --cross-prefix="${HOST}-" \
         --prefix="$prefix" --enable-static --disable-cli \
         && make -j"$JOBS" && make install)
 }
 
 build_x265() {
-    fetch "https://bitbucket.org/multicoreware/x265_git/downloads/x265_${X265_VERSION}.tar.gz" x265.tar.gz
+    fetch_cached "https://bitbucket.org/multicoreware/x265_git/downloads/x265_${X265_VERSION}.tar.gz" x265.tar.gz
     untar x265.tar.gz x265
     cmake -S x265/source -B x265/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
         -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_EXE_LINKER_FLAGS=-static \
         -DENABLE_SHARED=OFF -DENABLE_CLI=OFF
     cmake --build x265/build -j "$JOBS"
     cmake --install x265/build
 }
 
 build_dav1d() {
-    fetch "https://code.videolan.org/videolan/dav1d/-/archive/${DAV1D_VERSION}/dav1d-${DAV1D_VERSION}.tar.gz" dav1d.tar.gz
-    untar dav1d.tar.gz dav1d
+    fetch_cached "https://download.videolan.org/pub/videolan/dav1d/${DAV1D_VERSION}/dav1d-${DAV1D_VERSION}.tar.xz" dav1d.tar.xz
+    untar dav1d.tar.xz dav1d
     meson setup dav1d/build dav1d --cross-file cross.meson \
         --prefix "$prefix" --default-library static \
         -Denable_tools=false -Denable_tests=false
@@ -159,7 +142,7 @@ build_dav1d() {
 }
 
 build_svtav1() {
-    fetch "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/${SVTAV1_VERSION}/SVT-AV1-${SVTAV1_VERSION}.tar.gz" svtav1.tar.gz
+    fetch_cached "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/${SVTAV1_VERSION}/SVT-AV1-${SVTAV1_VERSION}.tar.gz" svtav1.tar.gz
     untar svtav1.tar.gz svtav1
     cmake -S svtav1 -B svtav1/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
@@ -170,7 +153,7 @@ build_svtav1() {
 }
 
 build_zimg() {
-    fetch "https://github.com/sekrit-twc/zimg/archive/refs/tags/${ZIMG_VERSION}.tar.gz" zimg.tar.gz
+    fetch_cached "https://github.com/sekrit-twc/zimg/archive/refs/tags/${ZIMG_VERSION}.tar.gz" zimg.tar.gz
     untar zimg.tar.gz zimg
     (cd zimg && ./autogen.sh && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared \
@@ -178,7 +161,7 @@ build_zimg() {
 }
 
 build_opus() {
-    fetch "https://downloads.xiph.org/releases/opus/opus-${OPUS_VERSION}.tar.gz" opus.tar.gz
+    fetch_cached "https://downloads.xiph.org/releases/opus/opus-${OPUS_VERSION}.tar.gz" opus.tar.gz
     untar opus.tar.gz opus
     (cd opus && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared --disable-doc --disable-extra-programs \
@@ -186,7 +169,7 @@ build_opus() {
 }
 
 build_lame() {
-    fetch "https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz" lame.tar.gz
+    fetch_cached "https://downloads.sourceforge.net/project/lame/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz" lame.tar.gz
     untar lame.tar.gz lame
     (cd lame && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared --disable-frontend \
@@ -194,12 +177,12 @@ build_lame() {
 }
 
 build_ogg_vorbis() {
-    fetch "https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.gz" ogg.tar.gz
+    fetch_cached "https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.gz" ogg.tar.gz
     untar ogg.tar.gz ogg
     (cd ogg && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared \
         && make -j"$JOBS" && make install)
-    fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.gz" vorbis.tar.gz
+    fetch_cached "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.gz" vorbis.tar.gz
     untar vorbis.tar.gz vorbis
     (cd vorbis && ./configure --host="$HOST" --prefix="$prefix" \
         --enable-static --disable-shared --disable-docs --disable-examples \
@@ -207,7 +190,7 @@ build_ogg_vorbis() {
 }
 
 build_vpx() {
-    fetch "https://github.com/webmproject/libvpx/archive/refs/tags/v${VPX_VERSION}.tar.gz" vpx.tar.gz
+    fetch_cached "https://github.com/webmproject/libvpx/archive/refs/tags/v${VPX_VERSION}.tar.gz" vpx.tar.gz
     untar vpx.tar.gz vpx
     (cd vpx && CROSS="${HOST}-" ./configure --target=x86_64-win64-gcc \
         --prefix="$prefix" --enable-static --disable-shared \
@@ -218,7 +201,7 @@ build_vpx() {
 # The oneVPL dispatcher, which is how ffmpeg reaches Quick Sync on Windows..
 # It pairs with the d3d11va and dxva2 support already enabled below
 build_libvpl() {
-    fetch "https://github.com/intel/libvpl/archive/refs/tags/${VPL_VERSION}.tar.gz" libvpl.tar.gz
+    fetch_cached "https://github.com/intel/libvpl/archive/refs/tags/${VPL_VERSION}.tar.gz" libvpl.tar.gz
     untar libvpl.tar.gz libvpl
     cmake -S libvpl -B libvpl/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
@@ -229,7 +212,7 @@ build_libvpl() {
 }
 
 build_webp() {
-    fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" webp.tar.gz
+    fetch_cached "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" webp.tar.gz
     untar webp.tar.gz webp
     cmake -S webp -B webp/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
@@ -243,7 +226,7 @@ build_webp() {
 }
 
 build_chromaprint() {
-    fetch "https://github.com/acoustid/chromaprint/archive/refs/tags/${CHROMAPRINT_VERSION}.tar.gz" chromaprint.tar.gz
+    fetch_cached "https://github.com/acoustid/chromaprint/archive/refs/tags/${CHROMAPRINT_VERSION}.tar.gz" chromaprint.tar.gz
     untar chromaprint.tar.gz chromaprint
     cmake -S chromaprint -B chromaprint/build -G Ninja \
         -DCMAKE_TOOLCHAIN_FILE="$workdir/cross.cmake" \
@@ -284,7 +267,7 @@ apply_patch_series "$PATCHDIR"
     --pkg-config-flags="--static" \
     --extra-libs="-lstdc++" \
     --extra-cflags="-I$prefix/include -DCHROMAPRINT_NODLL" \
-    --extra-ldflags="-L$prefix/lib" \
+    --extra-ldflags="-L$prefix/lib -static" \
     --disable-debug \
     --disable-doc \
     --disable-ffplay \
@@ -317,6 +300,13 @@ apply_patch_series "$PATCHDIR"
     --enable-chromaprint
 
 make -j"$JOBS"
+for binary in ffmpeg.exe ffprobe.exe; do
+    imports="$("${HOST}-objdump" -p "$binary")"
+    if grep -Eiq 'DLL Name: (libgcc_s[^ ]*|libstdc\+\+[^ ]*|libwinpthread[^ ]*)\.dll' <<< "$imports"; then
+        echo "$binary requires an unbundled MinGW runtime" >&2
+        exit 1
+    fi
+done
 stage="$workdir/stage"
 make DESTDIR="$stage" install
 

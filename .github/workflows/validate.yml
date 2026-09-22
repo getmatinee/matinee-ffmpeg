@@ -19,7 +19,7 @@ jobs:
       matrix:
         mode: [cpu, cuda]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install validation dependencies
         run: |

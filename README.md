@@ -25,7 +25,7 @@ Upstream FFmpeg as a GPL build (no `--enable-nonfree`, no libfdk and no libnpp),
 - **AV1 and scaling** (`libdav1d`, `libsvtav1`, `libzimg`) provide AV1 decode and encode, and software scaling.
 - **Subtitles** (`libass`, `libfreetype`, `libfontconfig`, `libfribidi`, `libharfbuzz`) provide the `subtitles` and `ass` filters, which render text subtitles onto video.
 - **Audio** (`libopus`, `libmp3lame`, `libvorbis`) adds the Opus, MP3 and Vorbis encoders alongside FFmpeg's own AAC encoder.
-- **Images and fingerprinting** (`libwebp`, `libvpx`, `chromaprint`) add WebP output for trickplay tiles, VP8 and VP9, and the chromaprint muxer for audio fingerprints.
+- **Images and fingerprinting** (`libwebp`, `libvpx`, `chromaprint`) add WebP image encoding, VP8 and VP9, and the chromaprint muxer for audio fingerprints. Matinee's trickplay sheets use FFmpeg's JPEG encoder.
 
 ## Base image
 
@@ -35,9 +35,13 @@ The container uses Debian trixie, which is built on glibc. Alpine cannot be used
 
 Pinned once in [`versions.env`](versions.env), sourced by all three build scripts. The current base is **upstream FFmpeg 9.0.2**, with a SHA-256 pin checked before extraction on every platform. Windows records each download's URL and content hash, so an existing `WORKDIR` cannot silently reuse a stale or damaged archive. Override both `FFMPEG_VERSION` and `FFMPEG_SHA256` when evaluating another release.
 
+The NVIDIA headers stay on SDK 13.0 to retain the driver 570 minimum. SDK 13.1 requires driver 610 and is not selected by this update. The driver requirements are recorded in the [upstream header release](https://github.com/FFmpeg/nv-codec-headers/tree/n13.0.19.0).
+
 ## Windows dependency cache
 
 Windows builds with a reusable `WORKDIR` isolate dependency prefixes by version pins, build recipes, compiler version and compiler/linker flags. Download caches record the source URL and content hash; changed or damaged entries are fetched again, and incomplete downloads are never promoted to cache entries.
+
+The Windows binaries link codec libraries and compiler runtimes statically. The build rejects MinGW runtime DLL imports before packaging the executables.
 
 Moving a checkout does not change the dependency key. Prefixes are retained so switching versions can reuse prior builds. Set `PRUNE_DEPENDENCY_CACHE=1` to remove other generated dependency prefixes after a successful Windows build; the current prefix, downloaded archives and unrelated directories are preserved. Use a separate `WORKDIR` for concurrent builds.
 
@@ -61,7 +65,7 @@ python3 tests/smoke.py /path/to/ffmpeg /path/to/ffprobe --gpu
 
 The GPU test requires an NVIDIA GPU and the runtime encode/decode libraries. It also checks empty hardware output and the visible dimensions of shared frames composited by `overlay_cuda`, and fails if a required pipeline cannot run. To verify error propagation, run `python3 tests/cuda_faults.py /path/to/configured-ffmpeg-build`: it rebuilds instrumented copies in a temporary directory and requires the production build dependencies and a working NVIDIA GPU.
 
-The image workflow runs validation before publishing and exercises the produced binaries for both architectures. Hardware runtime checks still require the matching devices.
+The GitHub validation workflow runs the CPU and CUDA suites. Before publishing a multi-architecture image, run the smoke suite against the produced binaries for each architecture. The current image publication workflow does not enforce that gate. Hardware runtime checks still require the matching devices.
 
 ## Container image
 
@@ -88,7 +92,7 @@ Some of the patches in this series were taken downstream from [jellyfin-ffmpeg](
 
 ## Support the project
 
-Matinee is free software, funded by sponsorship through [GitHub Sponsors](https://github.com/sponsors/getmatinee) or [Ko-fi](https://ko-fi.com/matinee) and by the 1.- per month subscription of the prebuilt phone apps on the App Store and Play Store. Building the same apps from the sources is free of charge. The subscription pays for the store distribution and supports the project. See the [main repository](https://github.com/getmatinee/matinee#support-the-project) for the full picture.
+Matinee is free software. You can support its maintenance through [GitHub Sponsors](https://github.com/sponsors/getmatinee) or [Ko-fi](https://ko-fi.com/matinee). Building the apps from source is free of charge. Store subscription billing is not implemented in this release. See [Support the project](https://github.com/getmatinee/matinee#support-the-project).
 
 ## License
 

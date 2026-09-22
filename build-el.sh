@@ -11,11 +11,6 @@ set -euo pipefail
 . "$(dirname "$0")/versions.env"
 . "$(dirname "$0")/common.sh"
 
-X265_VERSION="${X265_VERSION:-4.1}"
-SVTAV1_VERSION="${SVTAV1_VERSION:-v2.3.0}"
-ZIMG_VERSION="${ZIMG_VERSION:-release-3.0.5}"
-CHROMAPRINT_VERSION="${CHROMAPRINT_VERSION:-v1.5.1}"
-
 PREFIX="${PREFIX:-/usr/lib/matinee/ffmpeg}"
 PATCHDIR="${PATCHDIR:?set PATCHDIR to the exported ffmpeg patch series}"
 OUT="${OUT:?set OUT to the output tarball path}"
@@ -30,8 +25,9 @@ export PKG_CONFIG_PATH="$depprefix/lib/pkgconfig:$depprefix/lib64/pkgconfig"
 
 cd "$workdir"
 
-git clone --quiet --depth 1 --branch stable \
-    https://code.videolan.org/videolan/x264.git
+git init --quiet x264
+git -C x264 fetch --quiet --depth 1 https://code.videolan.org/videolan/x264.git "$X264_REF"
+git -C x264 checkout --quiet --detach FETCH_HEAD
 (cd x264 && ./configure --prefix="$depprefix" --enable-static --disable-cli \
     && make -j"$JOBS" && make install)
 
