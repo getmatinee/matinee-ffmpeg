@@ -12,7 +12,7 @@ The base is **FFmpeg 9.0.2**. The shared build helper rejects reversed patches, 
 | 0003 | Prevent software color conversion between hardware pixel formats. |
 | 0004 | CUDA vector constructors and tone-mapping math helpers. |
 | 0005 | CUDA luma dithering during bit-depth reduction, integrated with upstream scaling and anti-aliasing. |
-| 0006 | GPU tone mapping through `tonemap_cuda`, CUDA runtime linking and checked error/cleanup paths. |
+| 0006 | GPU tone mapping through `tonemap_cuda`, PTX module linking through the CUDA driver at load time, and checked error and cleanup paths. |
 | 0007 | Remove trailing NUL padding from ASS headers and trailers. |
 | 0008 | Preserve hardware frame contexts for empty video output. |
 | 0012 | Preserve queued subtitle end-of-stream signals during filter graph initialization. |

@@ -3,8 +3,7 @@
 # License: AGPL-3.0-or-later
 # https://github.com/getmatinee/matinee
 #
-# Verifies the pinned source, applies the series with no offset or fuzz, then builds
-# CPU and CUDA configurations and runs the regression and CPU smoke suites
+# Verifies the pinned source, applies the series without offset or fuzz, builds CPU and CUDA and runs the regression suites
 
 name: validate
 

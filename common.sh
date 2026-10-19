@@ -3,7 +3,7 @@
 # License: AGPL-3.0-or-later
 # https://github.com/getmatinee/matinee
 #
-# Shared source/patch helpers and Linux configure flags.
+# Shared source and patch helpers and the Linux configure flags
 
 install_nvcodec_headers() {
     git clone --quiet --depth 1 --branch "$NVCODEC_VERSION" \
@@ -40,7 +40,6 @@ build_cache_key() {
     { cat; for recipe in "$@"; do sha256sum < "$recipe" || return 1; done; } | sha256sum | cut -d ' ' -f1
 }
 
-# Remove generated dependency prefixes except the one used by a successful build
 prune_dependency_cache() {
     local workdir="$1" keep="$2" candidate name
     [[ "$keep" =~ ^[0-9a-f]{64}$ ]] || return 1

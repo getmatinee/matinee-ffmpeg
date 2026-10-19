@@ -198,8 +198,6 @@ build_vpx() {
         && make -j"$JOBS" && make install)
 }
 
-# The oneVPL dispatcher, which is how ffmpeg reaches Quick Sync on Windows..
-# It pairs with the d3d11va and dxva2 support already enabled below
 build_libvpl() {
     fetch_cached "https://github.com/intel/libvpl/archive/refs/tags/${VPL_VERSION}.tar.gz" libvpl.tar.gz
     untar libvpl.tar.gz libvpl
