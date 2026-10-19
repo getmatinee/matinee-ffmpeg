@@ -2,7 +2,7 @@
 
 Matinee's maintained patch series for upstream FFmpeg. Every build script applies the patches listed in [`series`](series), in order, after extracting the source and before running `./configure`. Update `series` when adding or removing a patch.
 
-The base is **FFmpeg 9.0.1**. The shared build helper rejects reversed patches, offsets, fuzz, and failed hunks. Patches retain the licenses and copyright notices of the files they modify (including MIT-licensed CUDA files); the resulting `--enable-gpl --enable-version3` build is GPL-3.0-or-later.
+The base is **FFmpeg 9.0.2**. The shared build helper rejects reversed patches, offsets, fuzz, and failed hunks. Patches retain the licenses and copyright notices of the files they modify (including MIT-licensed CUDA files); the resulting `--enable-gpl --enable-version3` build is GPL-3.0-or-later.
 
 ## Applied series
 
@@ -12,7 +12,7 @@ The base is **FFmpeg 9.0.1**. The shared build helper rejects reversed patches, 
 | 0003 | Prevent software color conversion between hardware pixel formats. |
 | 0004 | CUDA vector constructors and tone-mapping math helpers. |
 | 0005 | CUDA luma dithering during bit-depth reduction, integrated with upstream scaling and anti-aliasing. |
-| 0006 | GPU tone mapping through `tonemap_cuda`, CUDA runtime linking and checked error/cleanup paths. |
+| 0006 | GPU tone mapping through `tonemap_cuda`, PTX module linking through the CUDA driver at load time, and checked error and cleanup paths. |
 | 0007 | Remove trailing NUL padding from ASS headers and trailers. |
 | 0008 | Preserve hardware frame contexts for empty video output. |
 | 0012 | Preserve queued subtitle end-of-stream signals during filter graph initialization. |
@@ -22,7 +22,7 @@ Patch numbers remain stable across releases and retired numbers are not reused.
 
 | Retired | Reason |
 |---|---|
-| 0001 | NVDEC surface handling is included in upstream FFmpeg 9.0.1. |
+| 0001 | NVDEC surface handling is included in upstream FFmpeg 9.0.2. |
 | 0009 | Ordinary `hwdownload` output carries no hardware frames context, because `av_frame_copy_props` does not copy one, so no Matinee graph reaches the mapped-frame case. |
 | 0010 | `hwupload` device discovery is already handled by `hw_device_for_filter`, which falls back to the device `-hwaccel` registers. |
 | 0011 | VAAPI MJPEG range support covers an encoder Matinee never invokes, because every image and thumbnail is encoded in software. |

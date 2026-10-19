@@ -14,9 +14,9 @@ on:
       - common.sh
       - versions.env
       - patches/**
-#      - tests/**
-#      - validate.sh
-#      - .gitea/workflows/build-image.yml
+      - tests/**
+      - validate.sh
+      - .gitea/workflows/build-image.yml
   workflow_dispatch:
 
 jobs:
@@ -72,20 +72,21 @@ jobs:
             -f Containerfile .
           podman manifest inspect "$LOCAL_MANIFEST"
 
-#      - name: Validate before publishing
-#        env:
-#          LOCAL_MANIFEST: localhost/matinee-ffmpeg:${{ github.sha }}
-#        run: |
-#          podman run --rm --platform linux/amd64 --security-opt label=disable \
-#          . ./versions.env
-#            -v "$PWD:/checks:ro" --entrypoint bash "$LOCAL_MANIFEST" \
-#            /checks/validate.sh --cpu
-#          for platform in linux/amd64 linux/arm64; do
-#            podman run --rm --platform "$platform" --security-opt label=disable \
-#              -v "$PWD:/checks:ro" --entrypoint python3 "$LOCAL_MANIFEST" \
-#              /checks/tests/smoke.py /opt/matinee-ffmpeg/bin/ffmpeg \
-#              /opt/matinee-ffmpeg/bin/ffprobe --version "$FFMPEG_VERSION"
-#          done
+      - name: Validate before publishing
+        env:
+          LOCAL_MANIFEST: localhost/matinee-ffmpeg:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          . ./versions.env
+          podman run --rm --platform linux/amd64 --security-opt label=disable \
+            -v "$PWD:/checks:ro" --entrypoint bash "$LOCAL_MANIFEST" \
+            /checks/validate.sh --cpu
+          for platform in linux/amd64 linux/arm64; do
+            podman run --rm --platform "$platform" --security-opt label=disable \
+              -v "$PWD:/checks:ro" --entrypoint python3 "$LOCAL_MANIFEST" \
+              /checks/tests/smoke.py /opt/matinee-ffmpeg/bin/ffmpeg \
+              /opt/matinee-ffmpeg/bin/ffprobe --version "$FFMPEG_VERSION"
+          done
 
       - name: Push to Docker Hub
         if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}

@@ -59,7 +59,6 @@ def pause_resume(ffmpeg, directory, terminate=False):
             paused_size = size()
             time.sleep(0.6)
             assert size() == paused_size, "output continued while paused"
-            # A repeated pause must be idempotent
             send(b"p")
             time.sleep(0.6)
             assert size() == paused_size, "repeated pause resumed input"
@@ -149,7 +148,6 @@ def gpu(ffmpeg, ffprobe, directory):
                 "hwdownload,format=nv12", "-frames:v", "4", "-f", "null", "-")
     print("PASS CUDA scaler: four algorithms, downscale and same-size 10-to-8-bit")
 
-    # Encode an HDR-tagged HEVC source, then run it through real NVDEC, CUDA and NVENC
     for transfer in ("smpte2084", "arib-std-b67"):
         source = directory / f"hdr-{transfer}.mkv"
         output = directory / f"sdr-{transfer}.mp4"
@@ -181,7 +179,7 @@ def main():
     parser.add_argument("ffmpeg")
     parser.add_argument("ffprobe")
     parser.add_argument("--gpu", action="store_true")
-    parser.add_argument("--version", default="9.0.1",
+    parser.add_argument("--version", default="9.0.2",
                         help="expected FFmpeg version, normally from versions.env")
     args = parser.parse_args()
     expected = f"{args.version}-Matinee"

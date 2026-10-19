@@ -3,8 +3,7 @@
 // License: AGPL-3.0-or-later
 // https://github.com/getmatinee/matinee
 
-// Exercise the actual CLI subtitle queue before graph initialization, then
-// deliver its EOF into a real filter graph. Unused CLI code is linker-discarded.
+// Feeds the real CLI subtitle queue before graph setup, then its EOF into a real filter graph. The linker drops unused CLI code
 #include "fftools/ffmpeg_filter.c"
 
 int main(void)

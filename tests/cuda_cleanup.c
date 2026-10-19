@@ -3,8 +3,7 @@
 // License: AGPL-3.0-or-later
 // https://github.com/getmatinee/matinee
 
-// Fail the second texture allocation through the real CUDA-frame helper.
-// Fake driver calls let the compile-only CUDA job check cleanup without a GPU.
+// Fails the second texture allocation in the real CUDA frame helper, with fake driver calls so cleanup runs without a GPU
 #include "libavfilter/cuda/host_util.c"
 
 static int created, destroyed;
@@ -13,14 +12,16 @@ static CUresult CUDAAPI create_texture(CUtexObject *texture, const CUDA_RESOURCE
                                       const CUDA_TEXTURE_DESC *description,
                                       const CUDA_RESOURCE_VIEW_DESC *view)
 {
+    // Value '2' is CUDA_ERROR_OUT_OF_MEMORY, which the minimal nv-codec headers do not name
     if (++created == 2)
-        return (CUresult)2; // Out of memory; minimal nv-codec headers omit the name.
+        return (CUresult)2;
     *texture = 7;
     return CUDA_SUCCESS;
 }
 
 static CUresult CUDAAPI destroy_texture(CUtexObject texture)
 {
+    // Value '1' is CUDA_ERROR_INVALID_VALUE, which the minimal nv-codec headers do not name
     if (texture != 7) return (CUresult)1;
     destroyed++;
     return CUDA_SUCCESS;

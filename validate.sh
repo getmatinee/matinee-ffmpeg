@@ -36,8 +36,7 @@ if [ "$mode" = --cuda ]; then
                   --enable-filter=scale_cuda,tonemap_cuda)
 fi
 
-# A small build covers the CLI contract and optionally the CUDA patch compilation.
-# Full-featured builds still use the production build scripts
+# Just enough of FFmpeg for the CLI contract and the CUDA patches, full builds go through the production scripts
 ./configure --prefix="$workdir/install" --extra-version=Matinee \
     --disable-autodetect --disable-everything --disable-network --disable-doc \
     --disable-debug --disable-ffplay --enable-gpl --enable-libx264 \
